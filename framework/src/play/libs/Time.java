@@ -1,21 +1,12 @@
 package play.libs;
 
+import org.apache.commons.lang.NotImplementedException;
+
 import java.io.Serializable;
 import java.text.ParseException;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Locale;
-import java.util.Map;
-import java.util.SortedSet;
-import java.util.StringTokenizer;
-import java.util.TimeZone;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.apache.commons.lang.NotImplementedException;
 
 /**
  * Time utils
@@ -834,7 +825,7 @@ public class Time {
         }
 
         public String getExpressionSummary() {
-            StringBuffer buf = new StringBuffer();
+            StringBuilder buf = new StringBuilder();
 
             buf.append("seconds: ");
             buf.append(getExpressionSetSummary(seconds));
@@ -882,7 +873,7 @@ public class Time {
                 return "*";
             }
 
-            StringBuffer buf = new StringBuffer();
+            StringBuilder buf = new StringBuilder();
 
             Iterator<Integer> itr = set.iterator();
             boolean first = true;
@@ -908,7 +899,7 @@ public class Time {
                 return "*";
             }
 
-            StringBuffer buf = new StringBuffer();
+            StringBuilder buf = new StringBuilder();
 
             Iterator<Integer> itr = list.iterator();
             boolean first = true;
@@ -1126,8 +1117,8 @@ public class Time {
 
                 //if (endTime != null && cl.getTime().after(endTime)) return null;
 
-                SortedSet<Integer> st = null;
-                int t = 0;
+                SortedSet<Integer> st;
+                int t;
 
                 int sec = cl.get(Calendar.SECOND);
                 int min = cl.get(Calendar.MINUTE);
