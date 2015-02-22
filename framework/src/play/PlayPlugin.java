@@ -4,12 +4,9 @@ import java.lang.annotation.Annotation;
 import com.google.gson.JsonObject;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 import play.classloading.ApplicationClasses.ApplicationClass;
 import play.data.binding.RootParamNode;
 import play.db.Model;
@@ -22,6 +19,9 @@ import play.templates.Template;
 import play.test.BaseTest;
 import play.test.TestEngine.TestResults;
 import play.vfs.VirtualFile;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 /**
  * A framework plugin
@@ -274,11 +274,11 @@ public abstract class PlayPlugin implements Comparable<PlayPlugin> {
     }
 
     public List<ApplicationClass> onClassesChange(List<ApplicationClass> modified) {
-        return new ArrayList<ApplicationClass>();
+        return emptyList();
     }
 
     public List<String> addTemplateExtensions() {
-        return new ArrayList<String>();
+        return emptyList();
     }
 
     /**
@@ -287,7 +287,7 @@ public abstract class PlayPlugin implements Comparable<PlayPlugin> {
      * @return a Map from extensions (without dot) to mimetypes
      */
     public Map<String, String> addMimeTypes() {
-        return new HashMap<String, String>();
+        return emptyMap();
     }
 
     /**
@@ -368,7 +368,7 @@ public abstract class PlayPlugin implements Comparable<PlayPlugin> {
      * @return list of plugin supported unit test classes (empty list in default implementation)
      */
     public Collection<Class> getUnitTests() {
-        return Collections.emptyList();
+        return emptyList();
     }
 
     /**
@@ -384,7 +384,7 @@ public abstract class PlayPlugin implements Comparable<PlayPlugin> {
      * @return list of plugin supported functional test classes (empty list in default implementation)
      */
     public Collection<Class> getFunctionalTests() {
-        return Collections.emptyList();
+        return emptyList();
     }
 
     /** 
