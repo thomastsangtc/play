@@ -649,7 +649,7 @@ public class Play {
         } catch (PlayException e) {
             throw e;
         } catch (Exception e) {
-            // We have to do a clean refresh
+            Logger.info(e, "We have to do a clean refresh");
             start();
         }
     }
