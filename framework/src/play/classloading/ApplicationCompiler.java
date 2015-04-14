@@ -17,10 +17,7 @@ import play.classloading.ApplicationClasses.ApplicationClass;
 import play.exceptions.CompilationException;
 import play.exceptions.UnexpectedException;
 
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.StringTokenizer;
+import java.util.*;
 
 /**
  * Java compiler (uses eclipse JDT)
@@ -123,7 +120,10 @@ public class ApplicationCompiler {
      * Please compile this className
      */
     @SuppressWarnings("deprecation")
-    public void compile(String[] classNames) {
+    public void compile(final String[] classNames) {
+        if (classNames.length == 0) {
+          return;
+        }
 
         ICompilationUnit[] compilationUnits = new CompilationUnit[classNames.length];
         for (int i = 0; i < classNames.length; i++) {
@@ -287,8 +287,33 @@ public class ApplicationCompiler {
             }
         };
 
+        org.apache.log4j.Logger compilerLogger = org.apache.log4j.Logger.getLogger(ApplicationCompiler.class);
+        String sources = null;
+        if (compilerLogger.isTraceEnabled()) {
+            StringBuilder sb = new StringBuilder(" sources");
+            if (classNames.length > 0 && classNames.length < 10) {
+                sb.append(" [");
+                for (ICompilationUnit compilationUnit : compilationUnits) {
+                    sb.append(compilationUnit.getFileName()).append(',');
+                }
+                sb.append("]");
+            }
+            sources = sb.toString();
+        }
+        
+        long start = System.nanoTime();
         // Go !
         jdtCompiler.compile(compilationUnits);
 
+        long end = System.nanoTime();
+        totalCompilationTime += end - start;
+
+        if (compilerLogger.isTraceEnabled()) {
+            compilerLogger.trace("Compiled " +
+                compilationUnits.length + sources + " in " + (end - start) / 1000000 + " ms. " +
+                "Total compilation time: " + totalCompilationTime / 1000000 + " ms.");
+        }
     }
+  
+    private static long totalCompilationTime = 0;
 }

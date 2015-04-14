@@ -1,6 +1,7 @@
 package play.classloading;
 
 import org.apache.commons.io.IOUtils;
+import org.slf4j.LoggerFactory;
 import play.Logger;
 import play.Play;
 import play.cache.Cache;
@@ -10,7 +11,6 @@ import play.exceptions.UnexpectedException;
 import play.libs.IO;
 import play.vfs.VirtualFile;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -336,12 +336,23 @@ public class ApplicationClassloader extends ClassLoader {
             }
         }
         if (newDefinitions.size() > 0) {
-            Cache.clear();
+            // Cache.clear(); // Please, do not clear cache! It slows down development process.
+            
             if (HotswapAgent.enabled) {
                 try {
                     HotswapAgent.reload(newDefinitions.toArray(new ClassDefinition[newDefinitions.size()]));
-                } catch (Throwable e) {
-                    throw new RuntimeException("Need reload");
+                } catch (Throwable hotswapFailed) {
+                    StringBuilder log = new StringBuilder("Failed to update class definitions: [");
+                    for (ClassDefinition newDefinition : newDefinitions) {
+                      log.append(newDefinition.getDefinitionClass().getName()).append(", ");
+                    }
+                    log.append("], Need reload");
+
+                    // Ideally, we only need to recompile classes that depend on modified classes.
+                    // But it's too complicated. So, let's just recompile all classes.
+                    BytecodeCache.cleanCache();
+
+                    throw new RuntimeException(log.toString(), hotswapFailed);
                 }
             } else {
                 throw new RuntimeException("Need reload");
@@ -412,6 +423,8 @@ public class ApplicationClassloader extends ClassLoader {
 
                     List<ApplicationClass> all = new ArrayList<ApplicationClass>();
 
+                    readCachedBytecode();
+
                     for (VirtualFile virtualFile : Play.javaPath) {
                         all.addAll(getAllClasses(virtualFile));
                     }
@@ -444,6 +457,42 @@ public class ApplicationClassloader extends ClassLoader {
         }
         return allClasses;
     }
+
+    private void readCachedBytecode() {
+        org.slf4j.Logger logger = LoggerFactory.getLogger(ApplicationClassloader.class);
+
+        File[] cachedClasses = BytecodeCache.getCachedClasses();
+        for (File cachedClass : cachedClasses) {
+            VirtualFile javaFile = ApplicationClasses.getJava(cachedClass.getName());
+            if (javaFile == null) {
+                logger.trace("Remove cached class {}", cachedClass.getAbsolutePath());
+                cachedClass.delete();
+            }
+            else {
+                if (javaFile.lastModified() > cachedClass.lastModified()) {
+                    logger.trace("Cached class is old: {}. Remove and recompile from {}", 
+                        cachedClass.getAbsolutePath(), javaFile.getRealFile().getAbsolutePath());
+                    cachedClass.delete();
+                }
+                else {
+                    logger.trace("Read class from cache: {}", cachedClass.getAbsolutePath());
+                    try {
+                        ApplicationClass applicationClass = Play.classes.getApplicationClass(cachedClass.getName());
+                        if (!applicationClass.compiled) {
+                            byte[] enhancedBytecode = BytecodeCache.getBytecode(applicationClass.name, applicationClass.javaSource);
+                            applicationClass.compiled(enhancedBytecode);
+                            isUsingCachedClasses = true;
+                        }
+                    }
+                    catch (Throwable e) {
+                      logger.warn("Failed to load class from cache: " + cachedClass.getAbsolutePath(), e);
+                    }
+                }
+            }
+        }
+    }
+
+    public boolean isUsingCachedClasses = false;  
     List<Class> allClasses = null;
 
     /**

@@ -1,14 +1,16 @@
 package play.classloading;
 
+import org.apache.commons.io.FileUtils;
 import play.Logger;
 import play.Play;
 import play.PlayPlugin;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.FilenameFilter;
+import java.io.IOException;
 import java.security.MessageDigest;
 
+import static org.apache.commons.io.FileUtils.readFileToByteArray;
 import static org.apache.commons.io.FileUtils.writeByteArrayToFile;
 
 /**
@@ -22,13 +24,10 @@ public class BytecodeCache {
      */
     public static void deleteBytecode(String name) {
         try {
-            if (!Play.initialized || Play.tmpDir == null || Play.readOnlyTmp || !Play.configuration.getProperty("play.bytecodeCache", "true").equals("true")) {
+            if (!isBytecodeCacheEnabled() || Play.readOnlyTmp) {
                 return;
             }
-            File f = cacheFile(name.replace("/", "_").replace("{", "_").replace("}", "_").replace(":", "_"));
-            if (f.exists()) {
-                f.delete();
-            }
+            cacheFile(cacheFileName(name)).delete();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -37,37 +36,26 @@ public class BytecodeCache {
     /**
      * Retrieve the bytecode if source has not changed
      * @param name The cache name
-     * @param source The source code
+     * @param source The source
      * @return The bytecode
      */
     public static byte[] getBytecode(String name, String source) {
         try {
-            if (!Play.initialized || Play.tmpDir == null || !Play.configuration.getProperty("play.bytecodeCache", "true").equals("true")) {
+            if (isBytecodeCacheEnabled()) {
                 return null;
             }
-            File f = cacheFile(name.replace("/", "_").replace("{", "_").replace("}", "_").replace(":", "_"));
+            File f = cacheFile(cacheFileName(name));
             if (f.exists()) {
-                FileInputStream fis = new FileInputStream(f);
-                // Read hash
-                int offset = 0;
-                int read = -1;
-                StringBuilder hash = new StringBuilder();
-                // look for null byte, or end-of file
-                while ((read = fis.read()) > 0) {
-                    hash.append((char) read);
-                    offset++;
+                if (false) {
+                  // TODO check for modification
+//                if (f.lastModified() < javaSource.lastModified()) {
+//                  Logger.trace("Bytecode too old (%s < %s)", f.lastModified(), javaSource.lastModified());
+//                  deleteBytecode(name);
+//                  return null;
                 }
-                if (!hash(source).equals(hash.toString())) {
-                    if (Logger.isTraceEnabled()) {
-                        Logger.trace("Bytecode too old (%s != %s)", hash, hash(source));
-                    }
-                    fis.close();
-                    return null;
+                else {
+                  return readFileToByteArray(f);
                 }
-                byte[] byteCode = new byte[(int) f.length() - (offset + 1)];
-                fis.read(byteCode);
-                fis.close();
-                return byteCode;
             }
 
             if (Logger.isTraceEnabled()) {
@@ -79,6 +67,10 @@ public class BytecodeCache {
         }
     }
 
+    private static String cacheFileName(String name) {
+      return name.replace("/", "_").replace("{", "_").replace("}", "_").replace(":", "_");
+    }
+
     /**
      * Cache the bytecode
      * @param byteCode The bytecode
@@ -87,23 +79,16 @@ public class BytecodeCache {
      */
     public static void cacheBytecode(byte[] byteCode, String name, String source) {
         try {
-            if (!Play.initialized || Play.tmpDir == null || Play.readOnlyTmp || !Play.configuration.getProperty("play.bytecodeCache", "true").equals("true")) {
+            if (isBytecodeCacheEnabled() || Play.readOnlyTmp) {
                 return;
             }
-            File f = cacheFile(name.replace("/", "_").replace("{", "_").replace("}", "_").replace(":", "_"));
-            FileOutputStream fos = new FileOutputStream(f);
-            try {
-                fos.write(hash(source).getBytes("utf-8"));
-                fos.write(0);
-                fos.write(byteCode);
-            }
-            finally {
-                fos.close();
-            }
+            String cacheFileName = cacheFileName(name);
+            FileUtils.writeByteArrayToFile(cacheFile(cacheFileName), byteCode);
 
             // emit bytecode to standard class layout as well
+            // TODO Remove it. I guess it's not used.
             if (!name.contains("/") && !name.contains("{")) {
-                f = new File(Play.tmpDir, "classes/" + name.replace(".", "/") + ".class");
+                File f = new File(Play.tmpDir, "classes/" + name.replace(".", "/") + ".class");
                 f.getParentFile().mkdirs();
                 writeByteArrayToFile(f, byteCode);
             }
@@ -115,20 +100,31 @@ public class BytecodeCache {
             throw new RuntimeException(e);
         }
     }
+  
+    private static boolean isBytecodeCacheEnabled() {
+        return Play.tmpDir == null || !Play.configuration.getProperty("play.bytecodeCache", "true").equals("true");
+    }
 
     /**
-     * Build a hash of the source code.
-     * To efficiently track source code modifications.
+     * Build a hash of play version and enabled plugins
      */
-    static String hash(String text) {
+    static String hash() {
+        if (!Play.initialized) {
+          return Play.version + Play.mode.name();
+        }
         try {
             StringBuilder plugins = new StringBuilder();
-            for(PlayPlugin plugin : Play.pluginCollection.getEnabledPlugins()) {
+            plugins.append(Play.version);
+            plugins.append(Play.mode.name());
+            plugins.append(Play.initialized);
+            if (Play.initialized) {
+              for (PlayPlugin plugin : Play.pluginCollection.getEnabledPlugins()) {
                 plugins.append(plugin.getClass().getName());
+              }
             }
             MessageDigest messageDigest = MessageDigest.getInstance("MD5");
             messageDigest.reset();
-            messageDigest.update((Play.version + plugins + text).getBytes("utf-8"));
+            messageDigest.update(plugins.toString().getBytes("utf-8"));
             byte[] digest = messageDigest.digest();
             StringBuilder builder = new StringBuilder();
             for (int i = 0; i < digest.length; ++i) {
@@ -147,11 +143,34 @@ public class BytecodeCache {
     /**
      * Retrieve the real file that will be used as cache.
      */
-    static File cacheFile(String id) {
-        File dir = new File(Play.tmpDir, "bytecode/" + Play.mode.name());
+    static File cacheFile(String className) {
+        File dir = getCacheDir();
+        return new File(dir, className);
+    }
+
+    static File getCacheDir() {
+        File dir = new File(Play.tmpDir, "bytecode/" + hash());
         if (!dir.exists() && Play.tmpDir != null && !Play.readOnlyTmp) {
             dir.mkdirs();
         }
-        return new File(dir, id);
+        return dir;
+    }
+  
+    public static File[] getCachedClasses() {
+        File dir = getCacheDir();
+        return dir.listFiles(new FilenameFilter() {
+          @Override public boolean accept(File dir, String name) {
+            return !name.endsWith(".html") && !name.endsWith(".js") && !name.endsWith(".tag");
+          }
+        });
+    }
+  
+    public static void cleanCache() {
+        try {
+            FileUtils.cleanDirectory(getCacheDir());
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
