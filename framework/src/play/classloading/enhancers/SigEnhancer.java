@@ -10,6 +10,8 @@ import javassist.bytecode.Opcode;
 import javassist.bytecode.annotation.Annotation;
 import play.classloading.ApplicationClasses.ApplicationClass;
 
+import static javassist.Modifier.isAbstract;
+
 /**
  * Compute a unique hash for the class signature.
  */
@@ -28,33 +30,32 @@ public class SigEnhancer extends Enhancer {
 
         StringBuilder sigChecksum = new StringBuilder();
 
-        sigChecksum.append("Class->" + ctClass.getName() + ":");
+        sigChecksum.append("Class->").append(ctClass.getName()).append(":");
         for (Annotation annotation : getAnnotations(ctClass).getAnnotations()) {
-            sigChecksum.append(annotation + ",");
+            sigChecksum.append(annotation).append(",");
         }
 
         for (CtField field : ctClass.getDeclaredFields()) {
-            sigChecksum.append(" Field->" + ctClass.getName() + " " + field.getSignature() + ":");
-            sigChecksum.append(field.getSignature());
+            sigChecksum.append(" Field->").append(ctClass.getName()).append(" ").append(field.getSignature()).append(":");
             for (Annotation annotation : getAnnotations(field).getAnnotations()) {
-                sigChecksum.append(annotation + ",");
+                sigChecksum.append(annotation).append(",");
             }
         }
 
         for (CtMethod method : ctClass.getDeclaredMethods()) {
-            sigChecksum.append(" Method->" + method.getName() + method.getSignature() + ":");
+            sigChecksum.append(" Method->").append(method.getName()).append(method.getSignature()).append(":");
             for (Annotation annotation : getAnnotations(method).getAnnotations()) {
-                sigChecksum.append(annotation + " ");
+                sigChecksum.append(annotation).append(" ");
             }
             // Signatures names
             CodeAttribute codeAttribute = (CodeAttribute) method.getMethodInfo().getAttribute("Code");
-            if (codeAttribute == null || javassist.Modifier.isAbstract(method.getModifiers())) {
+            if (codeAttribute == null || isAbstract(method.getModifiers())) {
                 continue;
             }
             LocalVariableAttribute localVariableAttribute = (LocalVariableAttribute) codeAttribute.getAttribute("LocalVariableTable");
             if (localVariableAttribute != null) {
                 for (int i = 0; i < localVariableAttribute.tableLength(); i++) {
-                    sigChecksum.append(localVariableAttribute.variableName(i) + ",");
+                    sigChecksum.append(localVariableAttribute.variableName(i)).append(",");
                 }
             }
         }
@@ -66,8 +67,7 @@ public class SigEnhancer extends Enhancer {
                 int op = i.byteAt(index);
                 sigChecksum.append(op);
                 if (op == Opcode.LDC) {
-                    sigChecksum.append("[" + i.get().getConstPool().getLdcValue(i.byteAt(index + 1)) + "]");
-                    ;
+                    sigChecksum.append("[").append(i.get().getConstPool().getLdcValue(i.byteAt(index + 1))).append("]");
                 }
                 sigChecksum.append(".");
             }
@@ -80,14 +80,12 @@ public class SigEnhancer extends Enhancer {
                 int op = i.byteAt(index);
                 sigChecksum.append(op);
                 if (op == Opcode.LDC) {
-                    sigChecksum.append("[" + i.get().getConstPool().getLdcValue(i.byteAt(index + 1)) + "]");
-                    ;
+                    sigChecksum.append("[").append(i.get().getConstPool().getLdcValue(i.byteAt(index + 1))).append("]");
                 }
                 sigChecksum.append(".");
             }
         }
 
-        // Done.
         applicationClass.sigChecksum = sigChecksum.toString().hashCode();
     }
 }
