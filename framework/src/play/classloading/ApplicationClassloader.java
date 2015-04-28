@@ -7,6 +7,7 @@ import play.Play;
 import play.cache.Cache;
 import play.classloading.ApplicationClasses.ApplicationClass;
 import play.classloading.hash.ClassStateHashCreator;
+import play.exceptions.CompilationException;
 import play.exceptions.UnexpectedException;
 import play.libs.IO;
 import play.vfs.VirtualFile;
@@ -429,14 +430,26 @@ public class ApplicationClassloader extends ClassLoader {
                         all.addAll(getAllClasses(virtualFile));
                     }
                     List<String> classNames = new ArrayList<String>();
-                    for (int i = 0; i < all.size(); i++) {
-                        ApplicationClass applicationClass = all.get(i);
+                    for (ApplicationClass applicationClass : all) {
                         if (applicationClass != null && !applicationClass.compiled && applicationClass.isClass()) {
-                            classNames.add(all.get(i).name);
+                            classNames.add(applicationClass.name);
                         }
                     }
 
-                    Play.classes.compiler.compile(classNames.toArray(new String[classNames.size()]));
+                    try {
+                        Play.classes.compiler.compile(classNames.toArray(new String[classNames.size()]));
+                    }
+                    catch (CompilationException e) {
+                        org.slf4j.Logger logger = LoggerFactory.getLogger(ApplicationClassloader.class);
+                        logger.info("Partial recompilation failed, let's do the full recompile: " + e);
+                        BytecodeCache.cleanCache();
+
+                        classNames.clear();
+                        for (ApplicationClass applicationClass : all) {
+                            classNames.add(applicationClass.name);
+                        }
+                        Play.classes.compiler.compile(classNames.toArray(new String[classNames.size()]));
+                    }
 
                 }
 
