@@ -1,19 +1,10 @@
 package play.mvc;
 
-import java.io.File;
-import java.io.InputStream;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Stack;
-import java.util.concurrent.Future;
-
+import com.google.gson.JsonSerializer;
+import com.thoughtworks.xstream.XStream;
+import org.apache.commons.javaflow.Continuation;
+import org.apache.commons.javaflow.bytecode.StackRecorder;
 import org.w3c.dom.Document;
-
 import play.Invoker.Suspend;
 import play.Logger;
 import play.Play;
@@ -28,37 +19,30 @@ import play.data.binding.Unbinder;
 import play.data.validation.Validation;
 import play.data.validation.ValidationPlugin;
 import play.exceptions.*;
+import play.libs.F;
 import play.libs.Time;
 import play.mvc.Http.Request;
 import play.mvc.Router.ActionDefinition;
-import play.mvc.results.BadRequest;
+import play.mvc.results.*;
 import play.mvc.results.Error;
-import play.mvc.results.Forbidden;
-import play.mvc.results.NotFound;
-import play.mvc.results.NotModified;
-import play.mvc.results.Ok;
-import play.mvc.results.Redirect;
-import play.mvc.results.RedirectToStatic;
-import play.mvc.results.RenderBinary;
-import play.mvc.results.RenderHtml;
-import play.mvc.results.RenderJson;
-import play.mvc.results.RenderTemplate;
-import play.mvc.results.RenderText;
-import play.mvc.results.RenderXml;
-import play.mvc.results.Result;
-import play.mvc.results.Unauthorized;
 import play.templates.Template;
 import play.templates.TemplateLoader;
 import play.utils.Default;
 import play.utils.Java;
 import play.vfs.VirtualFile;
 
-import com.google.gson.JsonSerializer;
-import com.thoughtworks.xstream.XStream;
+import java.io.File;
+import java.io.InputStream;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import org.apache.commons.javaflow.Continuation;
-import org.apache.commons.javaflow.bytecode.StackRecorder;
-import play.libs.F;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Stack;
+import java.util.concurrent.Future;
 
 /**
  * Application controller support: The controller receives input and initiates a response by making calls on model objects.
@@ -373,7 +357,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
      * Send a 400 Bad request
      */
     protected static void badRequest() {
-        throw new BadRequest();
+        throw new BadRequest("Bad request");
     }
 
     /**
