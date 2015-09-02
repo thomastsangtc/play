@@ -636,10 +636,12 @@ public class Play {
                 classloader.detectChanges();
             }
             Router.detectChanges(ctxPath);
-            for(VirtualFile conf : confs) {
-                if (conf.lastModified() > startedAt) {
-                    start();
-                    return;
+            if ("true".equals(configuration.getProperty("play.restartOnConfChange.enabled", "true"))) {
+                for (VirtualFile conf : confs) {
+                    if (conf.lastModified() > startedAt) {
+                        start();
+                        return;
+                    }
                 }
             }
             pluginCollection.detectChange();
