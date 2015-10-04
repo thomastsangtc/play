@@ -273,8 +273,8 @@ public class ApplicationClasses {
         public boolean isClass() {
             return isClass(this.name);
         }
-
-	public static boolean isClass(String name) {
+        
+        public static boolean isClass(String name) {
             return !name.endsWith("package-info");
 	}
 
