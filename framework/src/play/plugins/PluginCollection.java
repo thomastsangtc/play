@@ -188,6 +188,8 @@ public class PluginCollection {
         }
 
 
+        compilePlugins(pluginsToLoad);
+
         for (LoadingPluginInfo info : pluginsToLoad) {
             Logger.trace("Loading plugin %s", info.name);
             try {
@@ -215,6 +217,14 @@ public class PluginCollection {
         // Must update Play.plugins-list one last time
         updatePlayPluginsList();
 
+    }
+
+    private void compilePlugins(SortedSet<LoadingPluginInfo> pluginsToLoad) {
+        Set<String> pluginsToCompile = new HashSet<String>(pluginsToLoad.size());
+        for (LoadingPluginInfo info : pluginsToLoad) {
+            pluginsToCompile.add(info.name);
+        }
+        Play.classes.load(pluginsToCompile);
     }
 
     /**

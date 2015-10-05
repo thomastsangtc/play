@@ -138,6 +138,17 @@ public class ApplicationClasses {
     public boolean hasClass(String name) {
         return classes.containsKey(name);
     }
+    
+    public void load(Collection<String> classNames) {
+        Set<JavaSourceFile> toCompile = new HashSet<JavaSourceFile>(classNames.size());
+        for (String className : classNames) {
+            ApplicationClass applicationClass = Play.classes.getApplicationClass(className);
+            if (applicationClass != null) {
+                toCompile.add(applicationClass.javaSourceFile);
+            }
+        }
+        compiler.compile(toCompile);
+    }
 
     /**
      * Represent a application class

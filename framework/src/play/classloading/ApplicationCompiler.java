@@ -104,12 +104,9 @@ public class ApplicationCompiler {
             return false;
         }
     }
-
-    /**
-     * Please compile this className
-     */
+    
     @SuppressWarnings("deprecation")
-    public void compile(Collection<JavaSourceFile> javaSources) {
+    void compile(Collection<JavaSourceFile> javaSources) {
 
         ICompilationUnit[] compilationUnits = new CompilationUnit[javaSources.size()];
         int i = 0;
@@ -124,7 +121,7 @@ public class ApplicationCompiler {
          */
         INameEnvironment nameEnvironment = new INameEnvironment() {
 
-            public NameEnvironmentAnswer findType(final char[][] compoundTypeName) {
+            @Override public NameEnvironmentAnswer findType(final char[][] compoundTypeName) {
                 final StringBuilder result = new StringBuilder(compoundTypeName.length * 7);
                 for (int i = 0; i < compoundTypeName.length; i++) {
                     if (i != 0) {
@@ -135,7 +132,7 @@ public class ApplicationCompiler {
                 return findType(result.toString());
             }
 
-            public NameEnvironmentAnswer findType(final char[] typeName, final char[][] packageName) {
+            @Override public NameEnvironmentAnswer findType(final char[] typeName, final char[][] packageName) {
                 final StringBuilder result = new StringBuilder(packageName.length * 7 + 1 + typeName.length);
                 for (int i = 0; i < packageName.length; i++) {
                     result.append(packageName[i]);
@@ -187,7 +184,7 @@ public class ApplicationCompiler {
                 }
             }
 
-            public boolean isPackage(char[][] parentPackageName, char[] packageName) {
+            @Override public boolean isPackage(char[][] parentPackageName, char[] packageName) {
                 // Rebuild something usable
                 String name;
                 if (parentPackageName == null) {
@@ -219,7 +216,7 @@ public class ApplicationCompiler {
                 return true;
             }
 
-            public void cleanup() {
+            @Override public void cleanup() {
             }
         };
 
@@ -228,7 +225,7 @@ public class ApplicationCompiler {
          */
         ICompilerRequestor compilerRequestor = new ICompilerRequestor() {
 
-            public void acceptResult(CompilationResult result) {
+            @Override public void acceptResult(CompilationResult result) {
                 // If error
                 if (result.hasErrors()) {
                     for (IProblem problem: result.getErrors()) {
