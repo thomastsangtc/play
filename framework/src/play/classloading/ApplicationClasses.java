@@ -48,6 +48,8 @@ public class ApplicationClasses {
         if (!classes.containsKey(name)) {
             JavaSourceFile javaFile = getJava(name);
             if (javaFile != null) {
+                // TODO Don't add uncompiled classes - it causes phantom ClassNotFound exception. 
+                // Add compiled classes only after successful compilation.
                 classes.put(name, new ApplicationClass(name, javaFile));
             }
         }
