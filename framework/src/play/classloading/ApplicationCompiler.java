@@ -14,13 +14,11 @@ import org.eclipse.jdt.internal.compiler.problem.DefaultProblemFactory;
 import play.Logger;
 import play.Play;
 import play.classloading.ApplicationClasses.ApplicationClass;
+import play.classloading.compiler.JavaSourceFile;
 import play.exceptions.CompilationException;
 import play.exceptions.UnexpectedException;
 
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.StringTokenizer;
+import java.util.*;
 
 /**
  * Java compiler (uses eclipse JDT)
@@ -72,40 +70,28 @@ public class ApplicationCompiler {
      */
     final class CompilationUnit implements ICompilationUnit {
 
-        private final String clazzName;
-        private final String fileName;
-        private final char[] typeName;
+        private final JavaSourceFile javaSourceFile;
         private final char[][] packageName;
 
-        CompilationUnit(String pClazzName) {
-            clazzName = pClazzName;
-            if (pClazzName.contains("$")) {
-                pClazzName = pClazzName.substring(0, pClazzName.indexOf("$"));
-            }
-            fileName = pClazzName.replace('.', '/') + ".java";
-            int dot = pClazzName.lastIndexOf('.');
-            if (dot > 0) {
-                typeName = pClazzName.substring(dot + 1).toCharArray();
-            } else {
-                typeName = pClazzName.toCharArray();
-            }
-            StringTokenizer izer = new StringTokenizer(pClazzName, ".");
-            packageName = new char[izer.countTokens() - 1][];
+        CompilationUnit(JavaSourceFile javaSourceFile) {
+            this.javaSourceFile = javaSourceFile;
+            StringTokenizer st = new StringTokenizer(javaSourceFile.compilationUnitName, "/");
+            packageName = new char[st.countTokens() - 1][];
             for (int i = 0; i < packageName.length; i++) {
-                packageName[i] = izer.nextToken().toCharArray();
+                packageName[i] = st.nextToken().toCharArray();
             }
         }
 
         @Override public char[] getFileName() {
-            return fileName.toCharArray();
+            return javaSourceFile.compilationUnitName.toCharArray();
         }
 
         @Override public char[] getContents() {
-            return applicationClasses.getApplicationClass(clazzName).javaSource.toCharArray();
+            return javaSourceFile.javaFile.contentAsString().toCharArray();
         }
 
         @Override public char[] getMainTypeName() {
-            return typeName;
+            return javaSourceFile.typeName.toCharArray();
         }
 
         @Override public char[][] getPackageName() {
@@ -123,11 +109,12 @@ public class ApplicationCompiler {
      * Please compile this className
      */
     @SuppressWarnings("deprecation")
-    public void compile(String[] classNames) {
+    public void compile(Collection<JavaSourceFile> javaSources) {
 
-        ICompilationUnit[] compilationUnits = new CompilationUnit[classNames.length];
-        for (int i = 0; i < classNames.length; i++) {
-            compilationUnits[i] = new CompilationUnit(classNames[i]);
+        ICompilationUnit[] compilationUnits = new CompilationUnit[javaSources.size()];
+        int i = 0;
+        for (JavaSourceFile javaSourceFile : javaSources) {
+            compilationUnits[i++] = new CompilationUnit(javaSourceFile);
         }
         IErrorHandlingPolicy policy = DefaultErrorHandlingPolicies.exitOnFirstError();
         IProblemFactory problemFactory = new DefaultProblemFactory(Locale.ENGLISH);
@@ -181,7 +168,7 @@ public class ApplicationCompiler {
                             return new NameEnvironmentAnswer(classFileReader, null);
                         }
                         // Cascade compilation
-                        ICompilationUnit compilationUnit = new CompilationUnit(name);
+                        ICompilationUnit compilationUnit = new CompilationUnit(applicationClass.javaSourceFile);
                         return new NameEnvironmentAnswer(compilationUnit, null);
                     }
 

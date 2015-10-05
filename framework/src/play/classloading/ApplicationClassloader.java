@@ -5,12 +5,12 @@ import play.Logger;
 import play.Play;
 import play.cache.Cache;
 import play.classloading.ApplicationClasses.ApplicationClass;
+import play.classloading.compiler.JavaSourceFile;
 import play.classloading.hash.ClassStateHashCreator;
 import play.exceptions.UnexpectedException;
 import play.libs.IO;
 import play.vfs.VirtualFile;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -161,6 +161,9 @@ public class ApplicationClassloader extends ClassLoader {
 
                 return applicationClass.javaClass;
             }
+            
+            // TODO Do not compile class one-by-one
+            // it means, remove method applicationClass.compile()
             if (applicationClass.javaByteCode != null || applicationClass.compile() != null) {
                 applicationClass.enhance();
                 applicationClass.javaClass = defineClass(applicationClass.name, applicationClass.enhancedByteCode, 0, applicationClass.enhancedByteCode.length, protectionDomain);
@@ -291,11 +294,11 @@ public class ApplicationClassloader extends ClassLoader {
         final Iterator<URL> it = urls.iterator();
         return new Enumeration<URL>() {
 
-            public boolean hasMoreElements() {
+            @Override public boolean hasMoreElements() {
                 return it.hasNext();
             }
 
-            public URL nextElement() {
+            @Override public URL nextElement() {
                 return it.next();
             }
         };
@@ -315,15 +318,22 @@ public class ApplicationClassloader extends ClassLoader {
         }
         Set<ApplicationClass> modifiedWithDependencies = new HashSet<ApplicationClass>();
         modifiedWithDependencies.addAll(modifieds);
-        if (modifieds.size() > 0) {
+        if (!modifieds.isEmpty()) {
             modifiedWithDependencies.addAll(Play.pluginCollection.onClassesChange(modifieds));
         }
+        
+        Set<JavaSourceFile> modifiedJavaSources = new HashSet<JavaSourceFile>(modifiedWithDependencies.size());
+        for (ApplicationClass modifiedClass : modifiedWithDependencies) {
+            modifiedJavaSources.add(modifiedClass.javaSourceFile);
+        }
+        
+        Play.classes.compiler.compile(modifiedJavaSources);
+        
         List<ClassDefinition> newDefinitions = new ArrayList<ClassDefinition>();
         boolean dirtySig = false;
         for (ApplicationClass applicationClass : modifiedWithDependencies) {
-            if (applicationClass.compile() == null) {
+            if (!applicationClass.compiled) {
                 Play.classes.classes.remove(applicationClass.name);
-                currentState = new ApplicationClassloaderState();//show others that we have changed..
             } else {
                 int sigChecksum = applicationClass.sigChecksum;
                 applicationClass.enhance();
@@ -332,9 +342,10 @@ public class ApplicationClassloader extends ClassLoader {
                 }
                 BytecodeCache.cacheBytecode(applicationClass.enhancedByteCode, applicationClass.name, applicationClass.javaSource);
                 newDefinitions.add(new ClassDefinition(applicationClass.javaClass, applicationClass.enhancedByteCode));
-                currentState = new ApplicationClassloaderState();//show others that we have changed..
             }
         }
+        currentState = new ApplicationClassloaderState(); // show others that we have changed..
+        
         if (newDefinitions.size() > 0) {
             Cache.clear();
             if (HotswapAgent.enabled) {
@@ -410,20 +421,21 @@ public class ApplicationClassloader extends ClassLoader {
 
                 if (!Play.pluginCollection.compileSources()) {
 
-                    List<ApplicationClass> all = new ArrayList<ApplicationClass>();
+                    Set<JavaSourceFile> allJavaSources = new HashSet<JavaSourceFile>();
 
                     for (VirtualFile virtualFile : Play.javaPath) {
-                        all.addAll(getAllClasses(virtualFile));
+                        allJavaSources.addAll(getAllJavaSources(virtualFile));
                     }
-                    List<String> classNames = new ArrayList<String>();
-                    for (int i = 0; i < all.size(); i++) {
-                        ApplicationClass applicationClass = all.get(i);
+                    
+                    Set<JavaSourceFile> toCompile = new HashSet<JavaSourceFile>(allJavaSources.size());
+                    for (JavaSourceFile javaSource : allJavaSources) {
+                        ApplicationClass applicationClass = Play.classes.getApplicationClass(javaSource.className);
                         if (applicationClass != null && !applicationClass.compiled && applicationClass.isClass()) {
-                            classNames.add(all.get(i).name);
+                            toCompile.add(javaSource);
                         }
                     }
 
-                    Play.classes.compiler.compile(classNames.toArray(new String[classNames.size()]));
+                    Play.classes.compiler.compile(toCompile);
 
                 }
 
@@ -436,7 +448,7 @@ public class ApplicationClassloader extends ClassLoader {
 
                 Collections.sort(allClasses, new Comparator<Class>() {
 
-                    public int compare(Class o1, Class o2) {
+                    @Override public int compare(Class o1, Class o2) {
                         return o1.getName().compareTo(o2.getName());
                     }
                 });
@@ -507,43 +519,36 @@ public class ApplicationClassloader extends ClassLoader {
     }
 
     // ~~~ Intern
-    List<ApplicationClass> getAllClasses(String basePackage) {
-        List<ApplicationClass> res = new ArrayList<ApplicationClass>();
-        for (VirtualFile virtualFile : Play.javaPath) {
-            res.addAll(getAllClasses(virtualFile, basePackage));
-        }
-        return res;
+    private Set<JavaSourceFile> getAllJavaSources(VirtualFile path) {
+        return scanSourceFolder(path, "");
     }
 
-    List<ApplicationClass> getAllClasses(VirtualFile path) {
-        return getAllClasses(path, "");
-    }
-
-    List<ApplicationClass> getAllClasses(VirtualFile path, String basePackage) {
-        if (basePackage.length() > 0 && !basePackage.endsWith(".")) {
-            basePackage += ".";
+    private Set<JavaSourceFile> scanSourceFolder(VirtualFile path, String basePackage) {
+        if (!basePackage.isEmpty() && !basePackage.endsWith(".")) {
+            basePackage += '.';
         }
-        List<ApplicationClass> res = new ArrayList<ApplicationClass>();
+        Set<JavaSourceFile> res = new HashSet<JavaSourceFile>();
         for (VirtualFile virtualFile : path.list()) {
             scan(res, basePackage, virtualFile);
         }
         return res;
     }
 
-    void scan(List<ApplicationClass> classes, String packageName, VirtualFile current) {
+    private void scan(Set<JavaSourceFile> javaSources, String packageName, VirtualFile current) {
         if (!current.isDirectory()) {
             if (current.getName().endsWith(".java") && !current.getName().startsWith(".")) {
                 String classname = packageName + current.getName().substring(0, current.getName().length() - 5);
-                classes.add(Play.classes.getApplicationClass(classname));
+                ApplicationClass applicationClass = Play.classes.getApplicationClass(classname);
+                javaSources.add(applicationClass.javaSourceFile);
             }
         } else {
             for (VirtualFile virtualFile : current.list()) {
-                scan(classes, packageName + current.getName() + ".", virtualFile);
+                scan(javaSources, packageName + current.getName() + ".", virtualFile);
             }
         }
     }
 
-    void scanPrecompiled(List<ApplicationClass> classes, String packageName, VirtualFile current) {
+    private void scanPrecompiled(List<ApplicationClass> classes, String packageName, VirtualFile current) {
         if (!current.isDirectory()) {
             if (current.getName().endsWith(".class") && !current.getName().startsWith(".")) {
                 String classname = packageName.substring(5) + current.getName().substring(0, current.getName().length() - 6);

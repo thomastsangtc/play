@@ -5,6 +5,7 @@ import javassist.CtClass;
 import play.Logger;
 import play.Play;
 import play.PlayPlugin;
+import play.classloading.compiler.JavaSourceFile;
 import play.classloading.enhancers.Enhancer;
 import play.exceptions.UnexpectedException;
 import play.vfs.VirtualFile;
@@ -13,10 +14,9 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
+import static java.util.Collections.singletonList;
 
 /**
  * Application classes container.
@@ -46,7 +46,7 @@ public class ApplicationClasses {
      */
     public ApplicationClass getApplicationClass(String name) {
         if (!classes.containsKey(name)) {
-            VirtualFile javaFile = getJava(name);
+            JavaSourceFile javaFile = getJava(name);
             if (javaFile != null) {
                 classes.put(name, new ApplicationClass(name, javaFile));
             }
@@ -152,6 +152,12 @@ public class ApplicationClasses {
          * A reference to the java source file
          */
         public VirtualFile javaFile;
+
+        /**
+         * A reference to the java source file with meta-info (package, compilation unit name etc.)
+         */
+        public JavaSourceFile javaSourceFile;
+        
         /**
          * The Java source
          */
@@ -192,9 +198,10 @@ public class ApplicationClasses {
             this(name, getJava(name));
         }
 
-        public ApplicationClass(String name, VirtualFile javaFile) {
+        public ApplicationClass(String name, JavaSourceFile javaFile) {
             this.name = name;
-            this.javaFile = javaFile;
+            this.javaFile = javaFile.javaFile;
+            this.javaSourceFile = javaFile;
             this.refresh();
         }
 
@@ -286,10 +293,13 @@ public class ApplicationClasses {
         /**
          * Compile the class from Java source
          * @return the bytes that comprise the class file
+         * 
+         * @Deprecated remove this method. Avoid compiling classes one-by-one.
          */
+        @Deprecated
         public byte[] compile() {
             long start = System.currentTimeMillis();
-            Play.classes.compiler.compile(new String[]{this.name});
+            Play.classes.compiler.compile(singletonList(javaSourceFile));
 
             if (Logger.isTraceEnabled()) {
                 Logger.trace("%sms to compile class %s", System.currentTimeMillis() - start, name);
@@ -329,7 +339,7 @@ public class ApplicationClasses {
      * @param name The fully qualified class name 
      * @return The virtualFile if found
      */
-    public static VirtualFile getJava(String name) {
+    public static JavaSourceFile getJava(String name) {
         String fileName = name;
         if (fileName.contains("$")) {
             fileName = fileName.substring(0, fileName.indexOf("$"));
@@ -348,7 +358,7 @@ public class ApplicationClasses {
             // 2. check if there is a file
             javaFile = path.child(fileName);
             if (javaFile.exists() && javaFile.matchName(fileName)) {
-                return javaFile;
+                return new JavaSourceFile(javaFile, fileName);
             }
         }
         return null;
