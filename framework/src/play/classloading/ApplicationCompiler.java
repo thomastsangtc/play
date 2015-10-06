@@ -20,6 +20,8 @@ import play.exceptions.UnexpectedException;
 
 import java.util.*;
 
+import static java.util.Collections.emptyList;
+
 /**
  * Java compiler (uses eclipse JDT)
  */
@@ -103,10 +105,23 @@ public class ApplicationCompiler {
             // TODO Auto-generated method stub
             return false;
         }
+
+        @Override public String toString() {
+            return javaSourceFile.typeName + ".java";
+        }
     }
-    
+
+    /**
+     * @param javaSources java files to compile
+     * @return list of newly compiled classes
+     */
     @SuppressWarnings("deprecation")
-    void compile(Collection<JavaSourceFile> javaSources) {
+    Collection<ApplicationClass> compile(Collection<JavaSourceFile> javaSources) {
+        if (javaSources.isEmpty()) {
+            return emptyList();
+        }
+        
+        final Collection<ApplicationClass> compiledClasses = new ArrayList<ApplicationClass>(javaSources.size());
 
         ICompilationUnit[] compilationUnits = new CompilationUnit[javaSources.size()];
         int i = 0;
@@ -155,17 +170,18 @@ public class ApplicationCompiler {
                     }
 
                     char[] fileName = name.toCharArray();
-                    ApplicationClass applicationClass = applicationClasses.getApplicationClass(name);
+                    ApplicationClass applicationClass = applicationClasses.getApplicationClass2(name);
 
                     // ApplicationClass exists
-                    if (applicationClass != null) {
+                    if (applicationClass != null && applicationClass.javaByteCode != null) {
+                        ClassFileReader classFileReader = new ClassFileReader(applicationClass.javaByteCode, fileName, true);
+                        return new NameEnvironmentAnswer(classFileReader, null);
+                    }
 
-                        if (applicationClass.javaByteCode != null) {
-                            ClassFileReader classFileReader = new ClassFileReader(applicationClass.javaByteCode, fileName, true);
-                            return new NameEnvironmentAnswer(classFileReader, null);
-                        }
+                    JavaSourceFile javaSourceFile = applicationClasses.getJava(name);
+                    if (javaSourceFile != null) {
                         // Cascade compilation
-                        ICompilationUnit compilationUnit = new CompilationUnit(applicationClass.javaSourceFile);
+                        ICompilationUnit compilationUnit = new CompilationUnit(javaSourceFile);
                         return new NameEnvironmentAnswer(compilationUnit, null);
                     }
 
@@ -208,7 +224,7 @@ public class ApplicationCompiler {
                     packagesCache.put(name, false);
                     return false;
                 }
-                if (applicationClasses.getApplicationClass(name) != null) {
+                if (applicationClasses.getApplicationClass2(name) != null) {
                     packagesCache.put(name, false);
                     return false;
                 }
@@ -236,7 +252,8 @@ public class ApplicationCompiler {
                             // Non sense !
                             message = problem.getArguments()[0] + " cannot be resolved";
                         }
-                        throw new CompilationException(Play.classes.getApplicationClass(className).javaFile, message, problem.getSourceLineNumber(), problem.getSourceStart(), problem.getSourceEnd());
+                        throw new CompilationException(Play.classes.getJava(className).javaFile, message, 
+                            problem.getSourceLineNumber(), problem.getSourceStart(), problem.getSourceEnd());
                     }
                 }
                 // Something has been compiled
@@ -256,7 +273,8 @@ public class ApplicationCompiler {
                         Logger.trace("Compiled %s", clazzName);
                     }
 
-                    applicationClasses.getApplicationClass(clazzName.toString()).compiled(clazzFile.getBytes());
+                    ApplicationClass applicationClass = applicationClasses.add(clazzName.toString(), clazzFile.getBytes());
+                    compiledClasses.add(applicationClass);
                 }
             }
         };
@@ -271,8 +289,20 @@ public class ApplicationCompiler {
             }
         };
 
+        Logger.info("Compile " + compilationUnits.length + " java sources" + unitsToString(compilationUnits));
+        long start = System.currentTimeMillis();
+        
         // Go !
         jdtCompiler.compile(compilationUnits);
 
+        long end = System.currentTimeMillis();
+        Logger.info("Compiled " + compiledClasses.size() + " classes with " + (end-start) + " ms.");
+
+
+        return compiledClasses;
+    }
+
+    private String unitsToString(ICompilationUnit[] compilationUnits) {
+        return compilationUnits.length > 10 ? "" : " " + Arrays.toString(compilationUnits);
     }
 }

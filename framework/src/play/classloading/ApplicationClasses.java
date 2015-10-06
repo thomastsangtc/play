@@ -40,10 +40,9 @@ public class ApplicationClasses {
     }
 
     /**
-     * Get a class by name
-     * @param name The fully qualified class name
-     * @return The ApplicationClass or null
+     * @deprecated Avoid using this method - it adds uncompiled (and potentially unexisting) class to "classes"
      */
+    @Deprecated
     public ApplicationClass getApplicationClass(String name) {
         if (!classes.containsKey(name)) {
             JavaSourceFile javaFile = getJava(name);
@@ -53,6 +52,16 @@ public class ApplicationClasses {
                 classes.put(name, new ApplicationClass(name, javaFile));
             }
         }
+        return classes.get(name);
+    }
+
+    /**
+     * Get a class by name
+     * @param name The fully qualified class name
+     * @return The ApplicationClass or null
+     */
+    // TODO Rename to getApplicationClass
+    public ApplicationClass getApplicationClass2(String name) {
         return classes.get(name);
     }
 
@@ -122,6 +131,13 @@ public class ApplicationClasses {
         classes.put(applicationClass.name, applicationClass);
     }
 
+    public ApplicationClass add(String className, byte[] code) {
+        ApplicationClass applicationClass = new ApplicationClass(className);
+        applicationClass.compiled(code);
+        add(applicationClass);
+        return applicationClass;
+    }
+
     /**
      * Remove a class from cache
      */
@@ -144,9 +160,9 @@ public class ApplicationClasses {
     public void load(Collection<String> classNames) {
         Set<JavaSourceFile> toCompile = new HashSet<JavaSourceFile>(classNames.size());
         for (String className : classNames) {
-            ApplicationClass applicationClass = Play.classes.getApplicationClass(className);
-            if (applicationClass != null) {
-                toCompile.add(applicationClass.javaSourceFile);
+            JavaSourceFile javaSourceFile = Play.classes.getJava(className);
+            if (javaSourceFile != null) {
+                toCompile.add(javaSourceFile);
             }
         }
         compiler.compile(toCompile);

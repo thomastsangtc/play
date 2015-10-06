@@ -25,6 +25,7 @@ import java.security.ProtectionDomain;
 import java.security.cert.Certificate;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static org.apache.commons.io.IOUtils.closeQuietly;
 
 /**
@@ -126,12 +127,12 @@ public class ApplicationClassloader extends ClassLoader {
                 }
                 return clazz;
             } catch (Exception e) {
-                throw new RuntimeException("Cannot find precompiled class file for " + name);
+                throw new RuntimeException("Cannot find precompiled class file for " + name + ": " + e);
             }
         }
 
         long start = System.currentTimeMillis();
-        ApplicationClass applicationClass = Play.classes.getApplicationClass(name);
+        ApplicationClass applicationClass = Play.classes.getApplicationClass2(name);
         if (applicationClass != null) {
             if (applicationClass.isDefinable()) {
                 return applicationClass.javaClass;
@@ -149,11 +150,7 @@ public class ApplicationClassloader extends ClassLoader {
             }
             if (bc != null) {
                 applicationClass.enhancedByteCode = bc;
-                applicationClass.javaClass = defineClass(applicationClass.name, applicationClass.enhancedByteCode, 0, applicationClass.enhancedByteCode.length, protectionDomain);
-                resolveClass(applicationClass.javaClass);
-                if (!applicationClass.isClass()) {
-                    applicationClass.javaPackage = applicationClass.javaClass.getPackage();
-                }
+                resolveJavaClass(applicationClass);
 
                 if (Logger.isTraceEnabled()) {
                     Logger.trace("%sms to load class %s from cache", System.currentTimeMillis() - start, name);
@@ -166,12 +163,8 @@ public class ApplicationClassloader extends ClassLoader {
             // it means, remove method applicationClass.compile()
             if (applicationClass.javaByteCode != null || applicationClass.compile() != null) {
                 applicationClass.enhance();
-                applicationClass.javaClass = defineClass(applicationClass.name, applicationClass.enhancedByteCode, 0, applicationClass.enhancedByteCode.length, protectionDomain);
+                resolveJavaClass(applicationClass);
                 BytecodeCache.cacheBytecode(applicationClass.enhancedByteCode, name, applicationClass.javaSource);
-                resolveClass(applicationClass.javaClass);
-                if (!applicationClass.isClass()) {
-                    applicationClass.javaPackage = applicationClass.javaClass.getPackage();
-                }
 
                 if (Logger.isTraceEnabled()) {
                     Logger.trace("%sms to load class %s", System.currentTimeMillis() - start, name);
@@ -182,6 +175,14 @@ public class ApplicationClassloader extends ClassLoader {
             Play.classes.classes.remove(name);
         }
         return null;
+    }
+
+    private void resolveJavaClass(ApplicationClass applicationClass) {
+        applicationClass.javaClass = defineClass(applicationClass.name, applicationClass.enhancedByteCode, 0, applicationClass.enhancedByteCode.length, protectionDomain);
+        resolveClass(applicationClass.javaClass);
+        if (!applicationClass.isClass()) {
+            applicationClass.javaPackage = applicationClass.javaClass.getPackage();
+        }
     }
 
     private String getPackageName(String name) {
@@ -322,26 +323,40 @@ public class ApplicationClassloader extends ClassLoader {
             modifiedWithDependencies.addAll(Play.pluginCollection.onClassesChange(modifieds));
         }
         
+        Map<String, Integer> classesSignatures = new HashMap<String, Integer>(modifiedWithDependencies.size());
         Set<JavaSourceFile> modifiedJavaSources = new HashSet<JavaSourceFile>(modifiedWithDependencies.size());
         for (ApplicationClass modifiedClass : modifiedWithDependencies) {
             modifiedJavaSources.add(modifiedClass.javaSourceFile);
+            classesSignatures.put(modifiedClass.name, modifiedClass.sigChecksum);
         }
         
-        Play.classes.compiler.compile(modifiedJavaSources);
+        Collection<ApplicationClass> compiledClasses = emptyList();
+        if (!modifiedJavaSources.isEmpty()) {
+            compiledClasses = Play.classes.compiler.compile(modifiedJavaSources);
+        }
         
         List<ClassDefinition> newDefinitions = new ArrayList<ClassDefinition>();
         boolean dirtySig = false;
-        for (ApplicationClass applicationClass : modifiedWithDependencies) {
+        for (ApplicationClass applicationClass : compiledClasses) {
             if (!applicationClass.compiled) {
                 Play.classes.classes.remove(applicationClass.name);
             } else {
-                int sigChecksum = applicationClass.sigChecksum;
+                Integer sigChecksum = classesSignatures.get(applicationClass.name);
                 applicationClass.enhance();
-                if (sigChecksum != applicationClass.sigChecksum) {
+                if (sigChecksum != null && applicationClass.sigChecksum != sigChecksum) {
                     dirtySig = true;
                 }
                 BytecodeCache.cacheBytecode(applicationClass.enhancedByteCode, applicationClass.name, applicationClass.javaSource);
+
+                try {
+                    applicationClass.javaClass = loadClass(applicationClass.name, true);
+                }
+                catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
+
                 newDefinitions.add(new ClassDefinition(applicationClass.javaClass, applicationClass.enhancedByteCode));
+                allClasses.add(applicationClass.javaClass);
             }
         }
         currentState = new ApplicationClassloaderState(); // show others that we have changed..
@@ -352,10 +367,10 @@ public class ApplicationClassloader extends ClassLoader {
                 try {
                     HotswapAgent.reload(newDefinitions.toArray(new ClassDefinition[newDefinitions.size()]));
                 } catch (Throwable e) {
-                    throw new RuntimeException("Need reload");
+                    throw new RuntimeException("Need reload: " + e);
                 }
             } else {
-                throw new RuntimeException("Need reload");
+                throw new RuntimeException("Need reload (hotswap is not enabled)");
             }
         }
         // Check signature (variable name & annotations aware !)
@@ -429,8 +444,8 @@ public class ApplicationClassloader extends ClassLoader {
                     
                     Set<JavaSourceFile> toCompile = new HashSet<JavaSourceFile>(allJavaSources.size());
                     for (JavaSourceFile javaSource : allJavaSources) {
-                        ApplicationClass applicationClass = Play.classes.getApplicationClass(javaSource.className);
-                        if (applicationClass != null && !applicationClass.compiled && applicationClass.isClass()) {
+                        ApplicationClass applicationClass = Play.classes.getApplicationClass2(javaSource.className);
+                        if (applicationClass == null || !applicationClass.compiled && applicationClass.isClass()) {
                             toCompile.add(javaSource);
                         }
                     }
@@ -537,9 +552,8 @@ public class ApplicationClassloader extends ClassLoader {
     private void scan(Set<JavaSourceFile> javaSources, String packageName, VirtualFile current) {
         if (!current.isDirectory()) {
             if (current.getName().endsWith(".java") && !current.getName().startsWith(".")) {
-                String classname = packageName + current.getName().substring(0, current.getName().length() - 5);
-                ApplicationClass applicationClass = Play.classes.getApplicationClass(classname);
-                javaSources.add(applicationClass.javaSourceFile);
+                String className = packageName + current.getName().substring(0, current.getName().length() - 5);
+                javaSources.add(Play.classes.getJava(className));
             }
         } else {
             for (VirtualFile virtualFile : current.list()) {
