@@ -53,9 +53,7 @@ public class ApplicationClassloader extends ClassLoader {
     public ApplicationClassloader() {
         super(ApplicationClassloader.class.getClassLoader());
         // Clean the existing classes
-        for (ApplicationClass applicationClass : Play.classes.all()) {
-            applicationClass.uncompile();
-        }
+        Play.classes.clear();
         pathHash = computePathHash();
         try {
             CodeSource codeSource = new CodeSource(new URL("file:" + Play.applicationPath.getAbsolutePath()), (Certificate[]) null);

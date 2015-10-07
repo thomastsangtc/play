@@ -338,13 +338,6 @@ public class ApplicationClasses {
         }
 
         /**
-         * Unload the class
-         */
-        public void uncompile() {
-            this.javaClass = null;
-        }
-
-        /**
          * Call back when a class is compiled.
          * @param code The bytecode.
          */
