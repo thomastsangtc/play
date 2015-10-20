@@ -107,6 +107,7 @@ help
 *.iml
 *.ipr
 *.iws
+out
 modules/router/lib/router.jar
 modules/grizzly/lib/play-grizzly.jar
 play.ipr
