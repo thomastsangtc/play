@@ -1,27 +1,23 @@
 package play.mvc;
 
-import java.lang.annotation.Annotation;
-import java.net.URLEncoder;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
-
 import play.Logger;
 import play.Play;
+import play.cache.Cache;
 import play.data.binding.Binder;
 import play.data.binding.ParamNode;
 import play.data.binding.RootParamNode;
 import play.data.parsing.DataParser;
 import play.data.parsing.DataParsers;
-import play.data.parsing.TextParser;
 import play.data.validation.Validation;
 import play.exceptions.UnexpectedException;
 import play.libs.Codec;
 import play.libs.Crypto;
 import play.libs.Time;
 import play.utils.Utils;
+
+import java.lang.annotation.Annotation;
+import java.net.URLEncoder;
+import java.util.*;
 
 /**
  * All application Scopes
@@ -33,6 +29,7 @@ public class Scope {
     public static final String COOKIE_EXPIRE = Play.configuration.getProperty("application.session.maxAge");
     public static final boolean SESSION_HTTPONLY = Play.configuration.getProperty("application.session.httpOnly", "false").toLowerCase().equals("true");
     public static final boolean SESSION_SEND_ONLY_IF_CHANGED = Play.configuration.getProperty("application.session.sendOnlyIfChanged", "false").toLowerCase().equals("true");
+    public static final boolean SESSION_SERVER_SIDE = Play.configuration.getProperty("application.session.serverSide", "false").toLowerCase().equals("true");
 
     /**
      * Flash scope
@@ -197,11 +194,49 @@ public class Scope {
                     }
                 }
 
+                if (SESSION_SERVER_SIDE) {
+                    session = validateAgainstServer(session);
+                }
+
                 return session;
             } catch (Exception e) {
                 throw new UnexpectedException("Corrupted HTTP session from " + Http.Request.current().remoteAddress, e);
             }
         }
+
+        private static Session validateAgainstServer(Session session) {
+            if (Cache.cacheImpl == null) return session;
+
+            String sessionId = session.data.get(ID_KEY);
+            Map<String, String> serverVersion = (Map<String, String>) Cache.get(session.getSessionCacheKey());
+            if (serverVersion == null) {
+                Logger.warn("Session %s not found in cache, %s", sessionId, Http.Request.current.get().url);
+                return session;
+            }
+
+            if (COOKIE_EXPIRE != null && Long.parseLong(serverVersion.get(TS_KEY)) < System.currentTimeMillis())
+                Logger.warn(
+                    "Session expired according to server data, session id %s, %s",
+                    serverVersion.get(ID_KEY),
+                    Http.Request.current.get().url);
+
+            if (!Objects.equals(serverVersion.get(AT_KEY), session.data.get(AT_KEY)))
+                Logger.warn(
+                    "Authenticy token mismatch, session id %s, %s",
+                    serverVersion.get(ID_KEY),
+                    Http.Request.current.get().url);
+
+            return session;
+        }
+
+        private void saveToServer(Session session) {
+            Cache.set(session.getSessionCacheKey(), session.data, "15mn");
+        }
+
+        private String getSessionCacheKey() {
+            return "session:" + data.get(ID_KEY);
+        }
+
         Map<String, String> data = new HashMap<String, String>(); // ThreadLocal access
         boolean changed = false;
         public static ThreadLocal<Session> current = new ThreadLocal<Session>();
@@ -256,6 +291,10 @@ public class Scope {
                     Http.Response.current().setCookie(COOKIE_PREFIX + "_SESSION", sign + "-" + sessionData, null, "/", null, COOKIE_SECURE, SESSION_HTTPONLY);
                 } else {
                     Http.Response.current().setCookie(COOKIE_PREFIX + "_SESSION", sign + "-" + sessionData, null, "/", Time.parseDuration(COOKIE_EXPIRE), COOKIE_SECURE, SESSION_HTTPONLY);
+                }
+
+                if (SESSION_SERVER_SIDE) {
+                    saveToServer(this);
                 }
             } catch (Exception e) {
                 throw new UnexpectedException("Session serializationProblem", e);
