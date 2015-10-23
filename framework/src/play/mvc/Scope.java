@@ -208,7 +208,16 @@ public class Scope {
             if (Cache.cacheImpl == null) return session;
 
             String sessionId = session.data.get(ID_KEY);
-            Map<String, String> serverVersion = (Map<String, String>) Cache.get(session.getSessionCacheKey());
+            Map<String, String> serverVersion;
+
+            try {
+                serverVersion = (Map<String, String>) Cache.get(session.getSessionCacheKey());
+            }
+            catch (Exception e) {
+                Logger.warn(e, "Error when retrieving session from cache");
+                return session;
+            }
+
             if (serverVersion == null) {
                 Logger.warn("Session %s not found in cache, %s", sessionId, Http.Request.current.get().url);
                 return session;
