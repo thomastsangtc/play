@@ -1,17 +1,15 @@
 package play.templates;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.Collections;
-
 import play.Logger;
 import play.Play;
-import play.vfs.VirtualFile;
 import play.exceptions.TemplateCompilationException;
 import play.exceptions.TemplateNotFoundException;
+import play.vfs.VirtualFile;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class TemplateLoader {
 
@@ -145,6 +143,43 @@ public class TemplateLoader {
      */
     public static void cleanCompiledCache() {
         templates.clear();
+    }
+
+    public static void gc() {
+        cleanCompiledCache();
+//        removeClassFromGlobalClassSet(ClassInfo.class);
+    }
+
+    private static void removeClassFromGlobalClassSet(Class<?> classInfoClass) {
+        try {
+            Field globalClassValueField = classInfoClass.getDeclaredField("globalClassValue");
+            globalClassValueField.setAccessible(true);
+            Object globalClassValue = globalClassValueField.get(null);
+            Method removeFromGlobalClassValue = globalClassValueField.getType().getDeclaredMethod("remove", Class.class);
+            removeFromGlobalClassValue.setAccessible(true);
+
+            Field globalClassSetField = classInfoClass.getDeclaredField("globalClassSet");
+            globalClassSetField.setAccessible(true);
+            Object globalClassSet = globalClassSetField.get(null);
+            globalClassSetField = globalClassSet.getClass().getDeclaredField("items");
+            globalClassSetField.setAccessible(true);
+            Object globalClassSetItems = globalClassSetField.get(globalClassSet);
+
+            Field clazzField = classInfoClass.getDeclaredField("klazz");
+            clazzField.setAccessible(true);
+
+
+            Iterator it = (Iterator) globalClassSetItems.getClass().getDeclaredMethod("iterator").invoke(globalClassSetItems);
+
+            while (it.hasNext()) {
+                Object classInfo = it.next();
+                Object clazz = clazzField.get(classInfo);
+                removeFromGlobalClassValue.invoke(globalClassValue, clazz);
+            }
+        }
+        catch (Exception e) {
+            play.Logger.error(e, "failed to cleanup groovy classloaders");
+        }
     }
 
     /**

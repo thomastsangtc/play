@@ -1,18 +1,7 @@
 package play;
 
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-
+import com.jamonapi.Monitor;
+import com.jamonapi.MonitorFactory;
 import play.Play.Mode;
 import play.classloading.enhancers.LocalvariablesNamesEnhancer.LocalVariablesNamesTracer;
 import play.exceptions.PlayException;
@@ -22,8 +11,10 @@ import play.libs.F;
 import play.libs.F.Promise;
 import play.utils.PThreadFactory;
 
-import com.jamonapi.Monitor;
-import com.jamonapi.MonitorFactory;
+import java.lang.annotation.Annotation;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Run some code in a Play! context
@@ -81,6 +72,15 @@ public class Invoker {
                 }
                 retry = true;
             }
+        }
+    }
+
+    public static void stop() {
+        Thread[] executorThreads = new Thread[executor.getPoolSize()];
+        Thread.enumerate(executorThreads);
+        for (Thread thread : executorThreads) {
+            if (thread != null)
+                thread.setContextClassLoader(ClassLoader.getSystemClassLoader());
         }
     }
 

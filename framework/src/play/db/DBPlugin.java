@@ -1,40 +1,26 @@
 package play.db;
 
-import java.io.File;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.sql.Connection;
-import java.sql.Driver;
-import java.sql.DriverManager;
-import java.sql.DriverPropertyInfo;
-import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-
-import javax.naming.Context;
-import javax.naming.InitialContext;
-import javax.sql.DataSource;
-
-import org.apache.commons.lang.StringUtils;
-
+import com.mchange.v2.c3p0.ComboPooledDataSource;
+import com.mchange.v2.c3p0.ConnectionCustomizer;
 import jregex.Matcher;
-import org.apache.log4j.Level;
+import org.apache.commons.lang.StringUtils;
 import play.Logger;
 import play.Play;
 import play.PlayPlugin;
+import play.db.DB.ExtendedDatasource;
 import play.exceptions.DatabaseException;
 import play.mvc.Http;
 import play.mvc.Http.Request;
 import play.mvc.Http.Response;
 
-import com.mchange.v2.c3p0.ComboPooledDataSource;
-import com.mchange.v2.c3p0.ConnectionCustomizer;
-
-import play.db.DB.ExtendedDatasource;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.sql.DataSource;
+import java.io.File;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.sql.*;
+import java.util.*;
 
 public class DBPlugin extends PlayPlugin {
 
@@ -161,6 +147,8 @@ public class DBPlugin extends PlayPlugin {
                         ds.setNumHelperThreads(Integer.parseInt(dbConfig.getProperty("db.pool.numHelperThreads", "3")));
                         ds.setUnreturnedConnectionTimeout(Integer.parseInt(dbConfig.getProperty("db.pool.unreturnedConnectionTimeout", "0")));
                         ds.setDebugUnreturnedConnectionStackTraces(Boolean.parseBoolean(dbConfig.getProperty("db.pool.debugUnreturnedConnectionStackTraces", "false")));
+                        ds.setContextClassLoaderSource("library");
+                        ds.setPrivilegeSpawnedThreads(true);
 
                         if (dbConfig.getProperty("db.testquery") != null) {
                             ds.setPreferredTestQuery(dbConfig.getProperty("db.testquery"));

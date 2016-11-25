@@ -1,17 +1,5 @@
 package play;
 
-import java.io.File;
-import java.io.InputStreamReader;
-import java.io.BufferedReader;
-import java.io.LineNumberReader;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URL;
-import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import play.cache.Cache;
 import play.classloading.ApplicationClasses;
 import play.classloading.ApplicationClassloader;
@@ -26,6 +14,14 @@ import play.plugins.PluginCollection;
 import play.templates.TemplateLoader;
 import play.utils.OrderSafeProperties;
 import play.vfs.VirtualFile;
+
+import java.io.*;
+import java.net.URI;
+import java.net.URL;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Main framework class
@@ -466,12 +462,14 @@ public class Play {
                     //registers shutdown hook - Now there's a good chance that we can notify
                     //our plugins that we're going down when some calls ctrl+c or just kills our process..
                     shutdownHookEnabled = true;
-                    Runtime.getRuntime().addShutdownHook(new Thread() {
-                        @Override
-                        public void run() {
+
+                    Thread hook = new Thread() {
+                        @Override public void run() {
                             Play.stop();
                         }
-                    });
+                    };
+                    hook.setContextClassLoader(ClassLoader.getSystemClassLoader());
+                    Runtime.getRuntime().addShutdownHook(hook);
                 }
             }
 
@@ -580,6 +578,8 @@ public class Play {
             started = false;
             Cache.stop();
             Router.lastLoading = 0L;
+            TemplateLoader.gc();
+            Invoker.stop();
         }
     }
 
