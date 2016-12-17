@@ -20,6 +20,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.FutureTask;
 
 import static java.util.Collections.addAll;
@@ -195,15 +196,7 @@ public class Java {
      * Retrieve parameter names of a method
      */
     public static String[] parameterNames(Method method) throws Exception {
-        com.sun.org.apache.bcel.internal.classfile.Method bcelMethod = com.sun.org.apache.bcel.internal.Repository.lookupClass(method.getDeclaringClass()).getMethod(method);
-        LocalVariable[] localVariables = bcelMethod.getLocalVariableTable().getLocalVariableTable();
-
-        List<String> result = new ArrayList<>();
-        for (LocalVariable variable : localVariables) {
-            if (variable.getStartPC() == 0 && !"this".equals(variable.getName()))
-                result.add(variable.getName());
-        }
-        return result.toArray(new String[result.size()]);
+        return getJavaWithCaching().parameterNames(method);
     }
 
     public static String rawMethodSignature(Method method) {
@@ -570,5 +563,23 @@ class JavaWithCaching {
         }
     }
 
+    private Map<Method, String[]> methodParameterNames = new ConcurrentHashMap<>();
 
+    public String[] parameterNames(Method method) {
+        String[] cached = methodParameterNames.get(method);
+        if (cached != null) return cached;
+
+        com.sun.org.apache.bcel.internal.classfile.Method bcelMethod = com.sun.org.apache.bcel.internal.Repository.lookupClass(method.getDeclaringClass()).getMethod(method);
+        LocalVariable[] localVariables = bcelMethod.getLocalVariableTable().getLocalVariableTable();
+
+        List<String> names = new ArrayList<>();
+        for (LocalVariable variable : localVariables) {
+            if (variable.getStartPC() == 0 && !"this".equals(variable.getName()))
+                names.add(variable.getName());
+        }
+
+        String[] result = names.toArray(new String[names.size()]);
+        methodParameterNames.put(method, result);
+        return result;
+    }
 }
