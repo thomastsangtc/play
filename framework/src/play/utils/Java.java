@@ -1,6 +1,7 @@
 package play.utils;
 
 
+import com.sun.org.apache.bcel.internal.classfile.LocalVariable;
 import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.bytecode.SourceFileAttribute;
@@ -194,11 +195,15 @@ public class Java {
      * Retrieve parameter names of a method
      */
     public static String[] parameterNames(Method method) throws Exception {
-        try {
-            return (String[]) method.getDeclaringClass().getDeclaredField("$" + method.getName() + LocalVariablesNamesTracer.computeMethodHash(method.getParameterTypes())).get(null);
-        } catch (Exception e) {
-            throw new UnexpectedException("Cannot read parameter names for " + method, e);
+        com.sun.org.apache.bcel.internal.classfile.Method bcelMethod = com.sun.org.apache.bcel.internal.Repository.lookupClass(method.getDeclaringClass()).getMethod(method);
+        LocalVariable[] localVariables = bcelMethod.getLocalVariableTable().getLocalVariableTable();
+
+        List<String> result = new ArrayList<>();
+        for (LocalVariable variable : localVariables) {
+            if (variable.getStartPC() == 0 && !"this".equals(variable.getName()))
+                result.add(variable.getName());
         }
+        return result.toArray(new String[result.size()]);
     }
 
     public static String rawMethodSignature(Method method) {
