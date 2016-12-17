@@ -566,19 +566,24 @@ class JavaWithCaching {
     private Map<Method, String[]> methodParameterNames = new ConcurrentHashMap<>();
 
     public String[] parameterNames(Method method) {
-        String[] cached = methodParameterNames.get(method);
-        if (cached != null) return cached;
+        String[] result = methodParameterNames.get(method);
+        if (result != null) return result;
 
-        com.sun.org.apache.bcel.internal.classfile.Method bcelMethod = com.sun.org.apache.bcel.internal.Repository.lookupClass(method.getDeclaringClass()).getMethod(method);
-        LocalVariable[] localVariables = bcelMethod.getLocalVariableTable().getLocalVariableTable();
+        if (method.getParameterTypes().length == 0) {
+            result = new String[0];
+        }
+        else {
+            com.sun.org.apache.bcel.internal.classfile.Method bcelMethod = com.sun.org.apache.bcel.internal.Repository.lookupClass(method.getDeclaringClass()).getMethod(method);
+            LocalVariable[] localVariables = bcelMethod.getLocalVariableTable().getLocalVariableTable();
 
-        List<String> names = new ArrayList<>();
-        for (LocalVariable variable : localVariables) {
-            if (variable.getStartPC() == 0 && !"this".equals(variable.getName()))
-                names.add(variable.getName());
+            List<String> names = new ArrayList<>();
+            for (LocalVariable variable : localVariables) {
+                if (variable.getStartPC() == 0 && !"this".equals(variable.getName()))
+                    names.add(variable.getName());
+            }
+            result = names.toArray(new String[names.size()]);
         }
 
-        String[] result = names.toArray(new String[names.size()]);
         methodParameterNames.put(method, result);
         return result;
     }
