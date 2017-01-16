@@ -131,14 +131,11 @@ public class Images {
             ImageWriter writer = ImageIO.getImageWritersByMIMEType(mimeType).next();
             ImageWriteParam params = writer.getDefaultWriteParam();
 
-            FileImageOutputStream toFs = new FileImageOutputStream(to);
-            try {
+            try (FileImageOutputStream toFs = new FileImageOutputStream(to)) {
                 writer.setOutput(toFs);
                 IIOImage image = new IIOImage(dest, null, null);
                 writer.write(null, image, params);
                 toFs.flush();
-            } finally {
-                toFs.close();
             }
             writer.dispose();
         } catch (Exception e) {
@@ -187,14 +184,11 @@ public class Images {
             ImageWriter writer = ImageIO.getImageWritersByMIMEType(mimeType).next();
             ImageWriteParam params = writer.getDefaultWriteParam();
 
-            FileImageOutputStream toFs = new FileImageOutputStream(to);
-            try {
+            try (FileImageOutputStream toFs = new FileImageOutputStream(to)) {
                 writer.setOutput(toFs);
                 IIOImage image = new IIOImage(dest, null, null);
                 writer.write(null, image, params);
                 toFs.flush();
-            } finally {
-                toFs.close();
             }
             writer.dispose();
         } catch (Exception e) {
@@ -238,7 +232,7 @@ public class Images {
         public BackgroundProducer background = new TransparentBackgroundProducer();
         public GimpyRenderer gimpy = new RippleGimpyRenderer();
         public Color textColor = Color.BLACK;
-        public List<Font> fonts = new ArrayList<Font>(2);
+        public List<Font> fonts = new ArrayList<>(2);
         public int w, h;
         public Color noise = null;
 

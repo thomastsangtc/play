@@ -171,7 +171,7 @@ public class WS extends PlayPlugin {
 
     }
 
-    private synchronized static void init() {
+    private static synchronized void init() {
         if (wsImpl != null)
             return;
         String implementation = Play.configuration.getProperty("webservice", "async");
@@ -192,7 +192,7 @@ public class WS extends PlayPlugin {
                     Logger.trace("Using the class:" + implementation + " for web service");
                 }
             } catch (Exception e) {
-                throw new RuntimeException("Unable to load the class: " + implementation + " for web service");
+                throw new RuntimeException("Unable to load the class: " + implementation + " for web service", e);
             }
         }
     }
@@ -243,7 +243,7 @@ public class WS extends PlayPlugin {
         public void stop();
     }
 
-    public static abstract class WSRequest {
+    public abstract static class WSRequest {
         public String url;
 
         /**
@@ -260,8 +260,8 @@ public class WS extends PlayPlugin {
          */
         public Object body;
         public FileParam[] fileParams;
-        public Map<String, String> headers = new HashMap<String, String>();
-        public Map<String, Object> parameters = new LinkedHashMap<String, Object>();
+        public Map<String, String> headers = new HashMap<>();
+        public Map<String, Object> parameters = new LinkedHashMap<>();
         public String mimeType;
 
         /**
@@ -607,7 +607,7 @@ public class WS extends PlayPlugin {
     /**
      * An HTTP response wrapper
      */
-    public static abstract class HttpResponse {
+    public abstract static class HttpResponse {
 
         private String _encoding = null;
 
@@ -717,7 +717,7 @@ public class WS extends PlayPlugin {
          *         is not formed as a query string.
          */
         public Map<String, String> getQueryString() {
-            Map<String, String> result = new HashMap<String, String>();
+            Map<String, String> result = new HashMap<>();
             String body = getString();
             for (String entry : body.split("&")) {
                 int pos = entry.indexOf("=");

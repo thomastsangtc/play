@@ -41,7 +41,7 @@ public class JavaExtensions {
         try {
             return (new XmlSlurper()).parseText(xml);
         } catch (Exception e) {
-            throw new RuntimeException("invalid XML");
+            throw new RuntimeException("invalid XML", e);
         }
     }
 
@@ -53,7 +53,7 @@ public class JavaExtensions {
     }
 
     public static String[] remove(String[] array, String s) {
-        List<String> temp = new ArrayList<String>(Arrays.asList(array));
+        List<String> temp = new ArrayList<>(Arrays.asList(array));
         temp.remove(s);
         return temp.toArray(new String[temp.size()]);
     }

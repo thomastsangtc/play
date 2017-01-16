@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.*;
@@ -42,49 +41,65 @@ import play.libs.F.T4;
  */
 public class Mailer implements LocalVariablesSupport {
 
-    protected static ThreadLocal<HashMap<String, Object>> infos = new ThreadLocal<HashMap<String, Object>>();
+    protected static final ThreadLocal<Map<String, Object>> infos = new ThreadLocal<>();
 
     /**
      * Set subject of mail, optionally providing formatting arguments
-     * @param subject plain String or formatted string - interpreted as formatted string only if aguments are provided
+     * @param subject plain String or formatted string - interpreted as formatted string only if arguments are provided
      * @param args optional arguments for formatting subject
      */
     public static void setSubject(String subject, Object... args) {
-        HashMap<String, Object> map = infos.get();
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
-	if(args.length != 0){
-	    subject = String.format(subject, args);
-	}
+        if (args.length != 0) {
+            subject = String.format(subject, args);
+        }
         map.put("subject", subject);
         infos.set(map);
     }
 
     @SuppressWarnings("unchecked")
+    public static void addRecipient(String... recipients) {
+        List<String> recipientsParam = Arrays.asList(recipients);
+        addRecipients(recipientsParam);
+    }
+
+    /**
+     * @Deprecated use method {{@link #addRecipient(String...)}}
+     */
     public static void addRecipient(Object... recipients) {
-        HashMap<String, Object> map = infos.get();
+        List<String> recipientList = new ArrayList<>(recipients.length);
+        for (Object recipient : recipients) {
+            recipientList.add(recipient.toString());
+        }
+        addRecipients(recipientList);
+    }
+
+    private static void addRecipients(List<String> recipientsParam) {
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
-        List recipientsList = (List<String>) map.get("recipients");
+        List<String> recipientsList = (List<String>) map.get("recipients");
         if (recipientsList == null) {
-            recipientsList = new ArrayList<String>();
+            recipientsList = new ArrayList<>();
             map.put("recipients", recipientsList);
         }
-        recipientsList.addAll(Arrays.asList(recipients));
+        recipientsList.addAll(recipientsParam);
         infos.set(map);
     }
 
     @SuppressWarnings("unchecked")
-    public static void addBcc(Object... bccs) {
-        HashMap<String, Object> map = infos.get();
+    public static void addBcc(String... bccs) {
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
-        List bccsList = (List<String>) map.get("bccs");
+        List<String> bccsList = (List<String>) map.get("bccs");
         if (bccsList == null) {
-            bccsList = new ArrayList<String>();
+            bccsList = new ArrayList<>();
             map.put("bccs", bccsList);
         }
         bccsList.addAll(Arrays.asList(bccs));
@@ -92,14 +107,14 @@ public class Mailer implements LocalVariablesSupport {
     }
 
     @SuppressWarnings("unchecked")
-    public static void addCc(Object... ccs) {
-        HashMap<String, Object> map = infos.get();
+    public static void addCc(String... ccs) {
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
-        List ccsList = (List<String>) map.get("ccs");
+        List<String> ccsList = (List<String>) map.get("ccs");
         if (ccsList == null) {
-            ccsList = new ArrayList<String>();
+            ccsList = new ArrayList<>();
             map.put("ccs", ccsList);
         }
         ccsList.addAll(Arrays.asList(ccs));
@@ -108,13 +123,13 @@ public class Mailer implements LocalVariablesSupport {
 
     @SuppressWarnings("unchecked")
     public static void addAttachment(EmailAttachment... attachments) {
-        HashMap<String, Object> map = infos.get();
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
         List<EmailAttachment> attachmentsList = (List<EmailAttachment>) map.get("attachments");
         if (attachmentsList == null) {
-            attachmentsList = new ArrayList<EmailAttachment>();
+            attachmentsList = new ArrayList<>();
             map.put("attachments", attachmentsList);
         }
         attachmentsList.addAll(Arrays.asList(attachments));
@@ -123,13 +138,13 @@ public class Mailer implements LocalVariablesSupport {
 
    @SuppressWarnings("unchecked")
    public static void attachDataSource(DataSource dataSource, String name, String description, String disposition) {
-        HashMap<String, Object> map = infos.get();
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
         List<T4<DataSource, String, String, String>> datasourceList = (List<T4<DataSource, String, String, String>>) map.get("datasources");
         if (datasourceList == null) {
-            datasourceList = new ArrayList<T4<DataSource, String, String, String>>();
+            datasourceList = new ArrayList<>();
             map.put("datasources", datasourceList);
         }
         datasourceList.add(F.T4(dataSource, name, description, disposition));
@@ -139,29 +154,29 @@ public class Mailer implements LocalVariablesSupport {
     public static void attachDataSource(DataSource dataSource, String name, String description){
        attachDataSource(dataSource, name, description, EmailAttachment.ATTACHMENT);
     }
-    
-	public static String attachInlineEmbed(DataSource dataSource, String name) {
-		HashMap<String, Object> map = infos.get();
-		if (map == null) {
-			throw new UnexpectedException("Mailer not instrumented ?");
-		}
-		
-		InlineImage inlineImage = new InlineImage(dataSource);
-		
-		Map<String, InlineImage> inlineEmbeds = (Map<String, InlineImage>) map.get("inlineEmbeds");
-		if (inlineEmbeds == null) {
-			inlineEmbeds = new HashMap<String, InlineImage>();
-			map.put("inlineEmbeds", inlineEmbeds);
-		}
-		
-		inlineEmbeds.put(name, inlineImage);
-		infos.set(map);
-		
-		return "cid:" + inlineImage.cid;
-	}
+
+    public static String attachInlineEmbed(DataSource dataSource, String name) {
+        Map<String, Object> map = infos.get();
+        if (map == null) {
+            throw new UnexpectedException("Mailer not instrumented ?");
+        }
+
+        InlineImage inlineImage = new InlineImage(dataSource);
+
+        Map<String, InlineImage> inlineEmbeds = (Map<String, InlineImage>) map.get("inlineEmbeds");
+        if (inlineEmbeds == null) {
+            inlineEmbeds = new HashMap<>();
+            map.put("inlineEmbeds", inlineEmbeds);
+        }
+
+        inlineEmbeds.put(name, inlineImage);
+        infos.set(map);
+
+        return "cid:" + inlineImage.cid;
+    }
 
     public static void setContentType(String contentType) {
-        HashMap<String, Object> map = infos.get();
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
@@ -174,13 +189,17 @@ public class Mailer implements LocalVariablesSupport {
      *
      * @param from
      */
-    public static void setFrom(Object from) {
-        HashMap<String, Object> map = infos.get();
+    public static void setFrom(String from) {
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
         map.put("from", from);
         infos.set(map);
+    }
+    
+    public static void setFrom(InternetAddress from) {
+        setFrom(from.toString());
     }
     
     private static class InlineImage {
@@ -190,7 +209,7 @@ public class Mailer implements LocalVariablesSupport {
         private final DataSource dataSource;
 
         public InlineImage(DataSource dataSource) {
-        	this(null, dataSource);
+            this(null, dataSource);
         }
 
         public InlineImage(String cid, DataSource dataSource) {
@@ -255,13 +274,18 @@ public class Mailer implements LocalVariablesSupport {
         }
     }
     
+    @Deprecated
     public static String getEmbedddedSrc(String urlString, String name) {
-        HashMap<String, Object> map = infos.get();
+        return getEmbeddedSrc(urlString, name);
+    }
+    
+    public static String getEmbeddedSrc(String urlString, String name) {
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
         
-        DataSource dataSource = null;
+        DataSource dataSource;
         URL url = null;
 
         VirtualFile img = Play.getVirtualFile(urlString);
@@ -288,8 +312,7 @@ public class Mailer implements LocalVariablesSupport {
             dataSource = new VirtualFileDataSource(img);
         }
 
-        Map<String, InlineImage> inlineEmbeds = (Map<String, InlineImage>) map
-                .get("inlineEmbeds");
+        Map<String, InlineImage> inlineEmbeds = (Map<String, InlineImage>) map.get("inlineEmbeds");
 
         // Check if a URLDataSource for this name has already been attached;
         // if so, return the cached CID value.
@@ -322,13 +345,10 @@ public class Mailer implements LocalVariablesSupport {
         }
 
         // Verify that the data source is valid.
-        InputStream is = null;
-        try {
-            is = dataSource.getInputStream();
+        
+        try (InputStream is = dataSource.getInputStream()) {
         } catch (IOException e) {
-            throw new UnexpectedException("Invalid URL", e);
-        } finally {
-            IOUtils.closeQuietly(is);
+            throw new UnexpectedException("Invalid URL " + urlString + " for image " + name, e);
         }
 
         return attachInlineEmbed(dataSource, name);
@@ -339,17 +359,21 @@ public class Mailer implements LocalVariablesSupport {
      *
      * @param replyTo
      */
-    public static void setReplyTo(Object replyTo) {
-        HashMap<String, Object> map = infos.get();
+    public static void setReplyTo(String replyTo) {
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
         map.put("replyTo", replyTo);
         infos.set(map);
     }
+    
+    public static void setReplyTo(InternetAddress replyTo) {
+        setReplyTo(replyTo.toString());
+    }
 
     public static void setCharset(String bodyCharset) {
-        HashMap<String, Object> map = infos.get();
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
@@ -359,35 +383,34 @@ public class Mailer implements LocalVariablesSupport {
 
     @SuppressWarnings("unchecked")
     public static void addHeader(String key, String value) {
-        HashMap<String, Object> map = infos.get();
+        Map<String, Object> map = infos.get();
         if (map == null) {
             throw new UnexpectedException("Mailer not instrumented ?");
         }
-        HashMap<String, String> headers = (HashMap<String, String>) map.get("headers");
+        Map<String, String> headers = (Map<String, String>) map.get("headers");
         if (headers == null) {
-            headers = new HashMap<String, String>();
+            headers = new HashMap<>();
         }
         headers.put(key, value);
         map.put("headers", headers);
         infos.set(map);
     }
 
-    @SuppressWarnings("unchecked")
     public static Future<Boolean> send(Object... args) {
         try {
-            final HashMap<String, Object> map = infos.get();
+            Map<String, Object> map = infos.get();
             if (map == null) {
                 throw new UnexpectedException("Mailer not instrumented ?");
             }
 
             // Body character set
-            final String charset = (String) infos.get().get("charset");
+            String charset = (String) infos.get().get("charset");
 
             // Headers
-            final Map<String, String> headers = (Map<String, String>) infos.get().get("headers");
+            Map<String, String> headers = (Map<String, String>) infos.get().get("headers");
 
             // Subject
-            final String subject = (String) infos.get().get("subject");
+            String subject = (String) infos.get().get("subject");
 
             String templateName = (String) infos.get().get("method");
             if (templateName.startsWith("notifiers.")) {
@@ -404,8 +427,8 @@ public class Mailer implements LocalVariablesSupport {
                 templateName = args[0].toString();
             }
 
-            final Map<String, Object> templateHtmlBinding = new HashMap<String, Object>();
-            final Map<String, Object> templateTextBinding = new HashMap<String, Object>();
+            Map<String, Object> templateHtmlBinding = new HashMap<>();
+            Map<String, Object> templateTextBinding = new HashMap<>();
             for (Object o : args) {
                 List<String> names = LocalVariablesNamesTracer.getAllLocalVariableNames(o);
                 for (String name : names) {
@@ -452,12 +475,12 @@ public class Mailer implements LocalVariablesSupport {
             }
 
             // Recipients
-            final List<Object> recipientList = (List<Object>) infos.get().get("recipients");
+            List<String> recipientList = (List<String>) infos.get().get("recipients");
             // From
-            final Object from = infos.get().get("from");
-            final Object replyTo = infos.get().get("replyTo");
+            String from = (String) infos.get().get("from");
+            String replyTo = (String) infos.get().get("replyTo");
 
-            Email email = null;
+            Email email;
             if (infos.get().get("attachments") == null && infos.get().get("datasources") == null && infos.get().get("inlineEmbeds") == null ) {
                 if (StringUtils.isEmpty(bodyHtml)) {
                     email = new SimpleEmail();
@@ -486,8 +509,8 @@ public class Mailer implements LocalVariablesSupport {
                     Map<String, InlineImage> inlineEmbeds = (Map<String, InlineImage>) infos.get().get("inlineEmbeds");
                     if (inlineEmbeds != null) {
                         for (Map.Entry<String, InlineImage> entry : inlineEmbeds.entrySet()) {
-	                    	htmlEmail.embed(entry.getValue().getDataSource(), entry.getKey(), entry.getValue().getCid());
-	                }
+                            htmlEmail.embed(entry.getValue().getDataSource(), entry.getKey(), entry.getValue().getCid());
+                        }
                     }
                 }
                 
@@ -500,8 +523,8 @@ public class Mailer implements LocalVariablesSupport {
                 }
 
                 // Handle DataSource
-                List<T4<DataSource, String, String, String>> datasourceList = (List<T4<DataSource, String, String, String>>) infos
-                        .get().get("datasources");
+                List<T4<DataSource, String, String, String>> datasourceList = 
+                        (List<T4<DataSource, String, String, String>>) infos.get().get("datasources");
                 if (datasourceList != null) {
                     for (T4<DataSource, String, String, String> ds : datasourceList) {
                         multiPartEmail.attach(ds._1, ds._2, ds._3, ds._4);
@@ -512,31 +535,31 @@ public class Mailer implements LocalVariablesSupport {
 
             if (from != null) {
                 try {
-                    InternetAddress iAddress = new InternetAddress(from.toString());
+                    InternetAddress iAddress = new InternetAddress(from);
                     email.setFrom(iAddress.getAddress(), iAddress.getPersonal());
                 } catch (Exception e) {
-                    email.setFrom(from.toString());
+                    email.setFrom(from);
                 }
 
             }
 
             if (replyTo != null) {
                 try {
-                    InternetAddress iAddress = new InternetAddress(replyTo.toString());
+                    InternetAddress iAddress = new InternetAddress(replyTo);
                     email.addReplyTo(iAddress.getAddress(), iAddress.getPersonal());
                 } catch (Exception e) {
-                    email.addReplyTo(replyTo.toString());
+                    email.addReplyTo(replyTo);
                 }
 
             }
 
             if (recipientList != null) {
-                for (Object recipient : recipientList) {
+                for (String recipient : recipientList) {
                     try {
-                        InternetAddress iAddress = new InternetAddress(recipient.toString());
+                        InternetAddress iAddress = new InternetAddress(recipient);
                         email.addTo(iAddress.getAddress(), iAddress.getPersonal());
                     } catch (Exception e) {
-                        email.addTo(recipient.toString());
+                        email.addTo(recipient);
                     }
                 }
             } else {
@@ -544,22 +567,22 @@ public class Mailer implements LocalVariablesSupport {
             }
 
 
-            List<Object> ccsList = (List<Object>) infos.get().get("ccs");
+            List<String> ccsList = (List<String>) infos.get().get("ccs");
             if (ccsList != null) {
-                for (Object cc : ccsList) {
-                    email.addCc(cc.toString());
+                for (String cc : ccsList) {
+                    email.addCc(cc);
                 }
             }
 
-            List<Object> bccsList = (List<Object>) infos.get().get("bccs");
+            List<String> bccsList = (List<String>) infos.get().get("bccs");
             if (bccsList != null) {
 
-                for (Object bcc : bccsList) {
+                for (String bcc : bccsList) {
                     try {
-                        InternetAddress iAddress = new InternetAddress(bcc.toString());
+                        InternetAddress iAddress = new InternetAddress(bcc);
                         email.addBcc(iAddress.getAddress(), iAddress.getPersonal());
                     } catch (Exception e) {
-                        email.addBcc(bcc.toString());
+                        email.addBcc(bcc);
                     }
                 }
             }
@@ -586,9 +609,7 @@ public class Mailer implements LocalVariablesSupport {
         try {
             Future<Boolean> result = send(args);
             return result.get();
-        } catch (InterruptedException e) {
-            Logger.error(e, "Error while waiting Mail.send result");
-        } catch (ExecutionException e) {
+        } catch (InterruptedException | ExecutionException e) {
             Logger.error(e, "Error while waiting Mail.send result");
         }
         return false;

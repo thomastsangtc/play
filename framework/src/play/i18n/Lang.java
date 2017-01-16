@@ -14,9 +14,9 @@ import java.util.*;
  */
 public class Lang {
 
-    static final ThreadLocal<String> current = new ThreadLocal<String>();
+    static final ThreadLocal<String> current = new ThreadLocal<>();
 
-    private static Map<String, Locale> cache = new HashMap<String, Locale>();
+    private static Map<String, Locale> cache = new HashMap<>();
     
     /**
      * Retrieve the current language or null
@@ -30,7 +30,7 @@ public class Lang {
             Http.Request currentRequest = Http.Request.current();
             if (currentRequest != null) {
                 // we have a current request - lets try to resolve language from it
-                resolvefrom(currentRequest);
+                resolveFrom(currentRequest);
             } else {
                 // don't have current request - just use default
                 setDefaultLocale();
@@ -99,7 +99,7 @@ public class Lang {
      * @return the closest matching locale. If no closest match for a language/country is found, null is returned
      */
     private static String findClosestMatch(Collection<String> desiredLocales) {
-        ArrayList<String> cleanLocales = new ArrayList<String>(desiredLocales.size());
+        ArrayList<String> cleanLocales = new ArrayList<>(desiredLocales.size());
         //look for an exact match
         for (String a : desiredLocales) {
             a = a.replace("-", "_");
@@ -144,7 +144,7 @@ public class Lang {
      *
      * @param request current request
      */
-    private static void resolvefrom(Request request) {
+    private static void resolveFrom(Request request) {
         // Check a cookie
         String cn = Play.configuration.getProperty("application.lang.cookie", "PLAY_LANG");
         if (request.cookies.containsKey(cn)) {

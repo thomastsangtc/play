@@ -43,20 +43,15 @@ public class Evolutions extends PlayPlugin {
     private static String EVOLUTIONS_TABLE_NAME = "play_evolutions";
     protected static File evolutionsDirectory = Play.getFile("db/evolutions");
 
-    private static Map<String, VirtualFile> modulesWithEvolutions = new LinkedHashMap<String, VirtualFile>();
+    private static Map<String, VirtualFile> modulesWithEvolutions = new LinkedHashMap<>();
 
     public static void main(String[] args) throws SQLException {
         /** Start the DB plugin **/
-        Play.id = System.getProperty("play.id");
-        Play.applicationPath = new File(System.getProperty("application.path"));
         Play.guessFrameworkPath();
         Play.readConfiguration();
-        Play.javaPath = new ArrayList<VirtualFile>();
         Play.classes = new ApplicationClasses();
         Play.classloader = new ApplicationClassloader();
 
-        Play.templatesPath = new ArrayList<VirtualFile>();
-        Play.modulesRoutes = new HashMap<String, VirtualFile>();
         Play.loadModules(VirtualFile.open(Play.applicationPath));
 
         if (System.getProperty("modules") != null) {
@@ -107,7 +102,7 @@ public class Evolutions extends PlayPlugin {
                         System.out.println("");
                         System.out.println(e.getEvolutionScript());
                         System.out.println("");
-                        System.out.println("~ The following error occured:");
+                        System.out.println("~ The following error occurred:");
                         System.out.println("");
                         System.out.println(e.getError());
                         System.out.println("");
@@ -498,13 +493,13 @@ public class Evolutions extends PlayPlugin {
         }
 
         if (containsDown) {
-            sql.insert(0, "# !!! WARNING! This script contains DOWNS evolutions that are likely destructives\n\n");
+            sql.insert(0, "# !!! WARNING! This script contains DOWNS evolutions that are likely destructive\n\n");
         }
 
         return sql.toString().trim();
     }
 
-    public synchronized static void checkEvolutionsState() {
+    public static synchronized void checkEvolutionsState() {
         // Look over all the DB
         Set<String> dBNames = Configuration.getDbNames();
         for (String dbName : dBNames) {
@@ -512,7 +507,7 @@ public class Evolutions extends PlayPlugin {
         }
     }
 
-    public synchronized static void checkEvolutionsState(String dbName) {
+    public static synchronized void checkEvolutionsState(String dbName) {
         for (Entry<String, VirtualFile> moduleRoot : modulesWithEvolutions.entrySet()) {
 
             if (DB.getDataSource(dbName) != null) {
@@ -551,11 +546,11 @@ public class Evolutions extends PlayPlugin {
         }
     }
 
-    public synchronized static List<Evolution> getEvolutionScript(String dbName, String moduleKey, VirtualFile evolutionsDirectory) {
+    public static synchronized List<Evolution> getEvolutionScript(String dbName, String moduleKey, VirtualFile evolutionsDirectory) {
         Stack<Evolution> app = listApplicationEvolutions(dbName, moduleKey, evolutionsDirectory);
         Stack<Evolution> db = listDatabaseEvolutions(dbName, moduleKey);
-        List<Evolution> downs = new ArrayList<Evolution>();
-        List<Evolution> ups = new ArrayList<Evolution>();
+        List<Evolution> downs = new ArrayList<>();
+        List<Evolution> ups = new ArrayList<>();
 
         // Apply non conflicting evolutions (ups and downs)
         while (db.peek().revision != app.peek().revision) {
@@ -575,16 +570,16 @@ public class Evolutions extends PlayPlugin {
         // Ups need to be applied earlier first
         Collections.reverse(ups);
 
-        List<Evolution> script = new ArrayList<Evolution>();
+        List<Evolution> script = new ArrayList<>();
         script.addAll(downs);
         script.addAll(ups);
 
         return script;
     }
 
-    public synchronized static Stack<Evolution> listApplicationEvolutions(String dBName, String moduleKey,
-            VirtualFile evolutionsDirectory) {
-        Stack<Evolution> evolutions = new Stack<Evolution>();
+    public static synchronized Stack<Evolution> listApplicationEvolutions(String dBName, String moduleKey,
+                                                                          VirtualFile evolutionsDirectory) {
+        Stack<Evolution> evolutions = new Stack<>();
         evolutions.add(new Evolution("", 0, "", "", true));
         if (evolutionsDirectory.exists()) {
             for (File evolution : evolutionsDirectory.getRealFile().listFiles()) {
@@ -651,8 +646,8 @@ public class Evolutions extends PlayPlugin {
         return true;
     }
 
-    public synchronized static Stack<Evolution> listDatabaseEvolutions(String dbName, String moduleKey) {
-        Stack<Evolution> evolutions = new Stack<Evolution>();
+    public static synchronized Stack<Evolution> listDatabaseEvolutions(String dbName, String moduleKey) {
+        Stack<Evolution> evolutions = new Stack<>();
         evolutions.add(new Evolution("", 0, "", "", false));
         Connection connection = null;
         try {

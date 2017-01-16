@@ -16,7 +16,6 @@ import play.Logger;
 import play.Play;
 import play.Play.Mode;
 import play.classloading.BytecodeCache;
-import play.classloading.enhancers.LocalvariablesNamesEnhancer.LocalVariablesNamesTracer;
 import play.data.binding.Unbinder;
 import play.exceptions.*;
 import play.exceptions.TemplateExecutionException.DoBodyException;
@@ -40,12 +39,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
 
-/**
- * A template
- */
 public class GroovyTemplate extends BaseTemplate {
 
-    static final Map<String, SafeFormatter> safeFormatters = new HashMap<String, SafeFormatter>();
+    static final Map<String, SafeFormatter> safeFormatters = new HashMap<>();
     
     static {
         safeFormatters.put("csv", new SafeCSVFormatter());
@@ -97,10 +93,6 @@ public class GroovyTemplate extends BaseTemplate {
         }
     }
     
-    /**
-     * Define the Compiler configuration
-     * @return the compiler Configuration
-     */
     protected CompilerConfiguration setUpCompilerConfiguration(){
         CompilerConfiguration compilerConfiguration = new CompilerConfiguration();        
         compilerConfiguration.setSourceEncoding("utf-8"); // ouf
@@ -118,7 +110,7 @@ public class GroovyTemplate extends BaseTemplate {
 
                 TClassLoader tClassLoader = new TClassLoader();
                 // Let's compile the groovy source
-                final List<GroovyClass> groovyClassesForThisTemplate = new ArrayList<GroovyClass>();
+                final List<GroovyClass> groovyClassesForThisTemplate = new ArrayList<>();
                 // ~~~ Please !
                 CompilerConfiguration compilerConfiguration = this.setUpCompilerConfiguration();
                 
@@ -128,7 +120,7 @@ public class GroovyTemplate extends BaseTemplate {
                 Field phasesF = compilationUnit.getClass().getDeclaredField("phaseOperations");
                 phasesF.setAccessible(true);
                 LinkedList[] phases = (LinkedList[]) phasesF.get(compilationUnit);
-                LinkedList<GroovyClassOperation> output = new LinkedList<GroovyClassOperation>();
+                LinkedList<GroovyClassOperation> output = new LinkedList<>();
                 phases[Phases.OUTPUT] = output;
                 output.add(new GroovyClassOperation() {
                     @Override
@@ -251,7 +243,7 @@ public class GroovyTemplate extends BaseTemplate {
             currentTemplate.set(this);
         }
         if (!args.containsKey("_body") && !args.containsKey("_isLayout") && !args.containsKey("_isInclude")) {
-            layoutData.set(new HashMap<Object, Object>());
+            layoutData.set(new HashMap<>());
             TagContext.init();
         }
         ExecutableTemplate t = (ExecutableTemplate) InvokerHelper.createScript(compiledTemplate, binding);
@@ -292,14 +284,14 @@ public class GroovyTemplate extends BaseTemplate {
             }
         }
         if (applyLayouts && layout.get() != null) {
-            Map<String, Object> layoutArgs = new HashMap<String, Object>(args);
+            Map<String, Object> layoutArgs = new HashMap<>(args);
             layoutArgs.remove("out");
             layoutArgs.put("_isLayout", true);
             String layoutR = layout.get().internalRender(layoutArgs);
 
             // Must replace '____%LAYOUT%____' inside the string layoutR with the content from writer..
-            final String whatToFind = "____%LAYOUT%____";
-            final int pos = layoutR.indexOf(whatToFind);
+            String whatToFind = "____%LAYOUT%____";
+            int pos = layoutR.indexOf(whatToFind);
             if (pos >=0) {
                 // prepending and appending directly to writer/buffer to prevent us
                 // from having to duplicate the string.
@@ -318,7 +310,7 @@ public class GroovyTemplate extends BaseTemplate {
 
     @Override
     protected Throwable cleanStackTrace(Throwable e) {
-        List<StackTraceElement> cleanTrace = new ArrayList<StackTraceElement>();
+        List<StackTraceElement> cleanTrace = new ArrayList<>();
         for (StackTraceElement se : e.getStackTrace()) {
             //Here we are parsing the classname to find the file on disk the template was generated from.
             //See GroovyTemplateCompiler.head() for more info.
@@ -352,7 +344,7 @@ public class GroovyTemplate extends BaseTemplate {
     /**
      * Groovy template
      */
-    public static abstract class ExecutableTemplate extends Script {
+    public abstract static class ExecutableTemplate extends Script {
 
         // Leave this field public to allow custom creation of TemplateExecutionException from different pkg
         public GroovyTemplate template;
@@ -396,7 +388,7 @@ public class GroovyTemplate extends BaseTemplate {
                 }
             }
             TagContext.enterTag(tag);
-            Map<String, Object> args = new HashMap<String, Object>();
+            Map<String, Object> args = new HashMap<>();
             args.put("session", getBinding().getVariables().get("session"));
             args.put("flash", getBinding().getVariables().get("flash"));
             args.put("request", getBinding().getVariables().get("request"));
@@ -545,9 +537,9 @@ public class GroovyTemplate extends BaseTemplate {
                         action = action.substring(0, action.length() - 5);
                     }
                     try {
-                        Map<String, Object> r = new HashMap<String, Object>();
+                        Map<String, Object> r = new HashMap<>();
                         Method actionMethod = (Method) ActionInvoker.getActionMethod(action)[1];
-                        String[] names = (String[]) actionMethod.getDeclaringClass().getDeclaredField("$" + actionMethod.getName() + LocalVariablesNamesTracer.computeMethodHash(actionMethod.getParameterTypes())).get(null);
+                        String[] names = Java.parameterNames(actionMethod);
                         if (param instanceof Object[]) {
                             if(((Object[])param).length == 1 && ((Object[])param)[0] instanceof Map) {
                                 r = (Map<String,Object>)((Object[])param)[0];

@@ -78,14 +78,14 @@ public class WSAsync implements WSImpl {
             try {
                 proxyPortInt = Integer.parseInt(proxyPort);
             } catch (NumberFormatException e) {
-                Logger.error(
+                Logger.error(e, 
                         "Cannot parse the proxy port property '%s'. Check property http.proxyPort either in System configuration or in Play config file.",
                         proxyPort);
                 throw new IllegalStateException("WS proxy is misconfigured -- check the logs for details");
             }
             ProxyServer proxy = new ProxyServer(proxyHost, proxyPortInt, proxyUser, proxyPassword);
             if (nonProxyHosts != null) {
-                final String[] strings = nonProxyHosts.split("\\|");
+                String[] strings = nonProxyHosts.split("\\|");
                 for (String uril : strings) {
                     proxy.addNonProxyHost(uril);
                 }
@@ -435,7 +435,7 @@ public class WSAsync implements WSImpl {
 
         private Promise<HttpResponse> execute(BoundRequestBuilder builder) {
             try {
-                final Promise<HttpResponse> smartFuture = new Promise<HttpResponse>();
+                final Promise<HttpResponse> smartFuture = new Promise<>();
                 prepare(builder).execute(new AsyncCompletionHandler<HttpResponse>() {
                     @Override
                     public HttpResponse onCompleted(Response response) throws Exception {
@@ -648,7 +648,7 @@ public class WSAsync implements WSImpl {
         @Override
         public List<Header> getHeaders() {
             Map<String, List<String>> hdrs = response.getHeaders();
-            List<Header> result = new ArrayList<Header>();
+            List<Header> result = new ArrayList<>();
             for (String key : hdrs.keySet()) {
                 result.add(new Header(key, hdrs.get(key)));
             }

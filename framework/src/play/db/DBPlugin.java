@@ -22,7 +22,6 @@ import javax.sql.DataSource;
 import org.apache.commons.lang.StringUtils;
 
 import jregex.Matcher;
-import org.apache.log4j.Level;
 import play.Logger;
 import play.Play;
 import play.PlayPlugin;
@@ -35,9 +34,7 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
 import com.mchange.v2.c3p0.ConnectionCustomizer;
 
 import play.db.DB.ExtendedDatasource;
-/**
- * The DB plugin
- */
+
 public class DBPlugin extends PlayPlugin {
 
     public static String url = "";
@@ -49,7 +46,7 @@ public class DBPlugin extends PlayPlugin {
             response.status = Http.StatusCode.FOUND;
             String serverOptions[] = new String[] { };
 
-            // For H2 embeded database, we'll also start the Web console
+            // For H2 embedded database, we'll also start the Web console
             if (h2Server != null) {
                 h2Server.stop();
             }
@@ -120,7 +117,7 @@ public class DBPlugin extends PlayPlugin {
                             Driver d = (Driver) Class.forName(driver, true, Play.classloader).newInstance();
                             DriverManager.registerDriver(new ProxyDriver(d));
                         } catch (Exception e) {
-                            throw new Exception("Database [" + dbName + "] Driver not found (" + driver + ")");
+                            throw new Exception("Database [" + dbName + "] Driver not found (" + driver + ")", e);
                         }
 
                         // Try the connection
@@ -163,6 +160,8 @@ public class DBPlugin extends PlayPlugin {
                         ds.setNumHelperThreads(Integer.parseInt(dbConfig.getProperty("db.pool.numHelperThreads", "3")));
                         ds.setUnreturnedConnectionTimeout(Integer.parseInt(dbConfig.getProperty("db.pool.unreturnedConnectionTimeout", "0")));
                         ds.setDebugUnreturnedConnectionStackTraces(Boolean.parseBoolean(dbConfig.getProperty("db.pool.debugUnreturnedConnectionStackTraces", "false")));
+                        ds.setContextClassLoaderSource("library");
+                        ds.setPrivilegeSpawnedThreads(true);
 
                         if (dbConfig.getProperty("db.testquery") != null) {
                             ds.setPreferredTestQuery(dbConfig.getProperty("db.testquery"));
@@ -242,7 +241,7 @@ public class DBPlugin extends PlayPlugin {
             out.println("Jdbc url: " + datasource.getJdbcUrl());
             out.println("Jdbc driver: " + datasource.getDriverClass());
             out.println("Jdbc user: " + datasource.getUser());
-    	    if (Play.mode.isDev()) {
+            if (Play.mode.isDev()) {
               out.println("Jdbc password: " + datasource.getPassword());
             }
             out.println("Min pool size: " + datasource.getMinPoolSize());
@@ -288,7 +287,7 @@ public class DBPlugin extends PlayPlugin {
             String datasourceName = dbConfig.getProperty("db", "");
             DataSource ds = DB.getDataSource(dbName);
                      
-            if ((datasourceName.startsWith("java:")) && dbConfig.getProperty("db.url") == null) {
+            if ((datasourceName.startsWith("java:") || datasourceName.startsWith("jndi:")) && dbConfig.getProperty("db.url") == null) {
                 if (ds == null) {
                     return true;
                 }
@@ -306,8 +305,8 @@ public class DBPlugin extends PlayPlugin {
                 String name = m.group("name");
                 String host = m.group("host");
                 String parameters = m.group("parameters");
-        		
-                Map<String, String> paramMap = new HashMap<String, String>();
+
+                Map<String, String> paramMap = new HashMap<>();
                 paramMap.put("useUnicode", "yes");
                 paramMap.put("characterEncoding", "UTF-8");
                 paramMap.put("connectionCollation", "utf8_general_ci");
@@ -377,24 +376,24 @@ public class DBPlugin extends PlayPlugin {
     }
     
     private static void addParameters(Map<String, String> paramsMap, String urlQuery) {
-    	if (!StringUtils.isBlank(urlQuery)) {
-	    	String[] params = urlQuery.split("[\\&]");
-	    	for (String param : params) {
-				String[] parts = param.split("[=]");
-				if (parts.length > 0 && !StringUtils.isBlank(parts[0])) {
-				    paramsMap.put(parts[0], parts.length > 1 ? StringUtils.stripToNull(parts[1]) : null);
-				}
-			}
-    	}
+        if (!StringUtils.isBlank(urlQuery)) {
+            String[] params = urlQuery.split("[\\&]");
+            for (String param : params) {
+                String[] parts = param.split("[=]");
+                if (parts.length > 0 && !StringUtils.isBlank(parts[0])) {
+                    paramsMap.put(parts[0], parts.length > 1 ? StringUtils.stripToNull(parts[1]) : null);
+                }
+            }
+        }
     }
     
     private static String toQueryString(Map<String, String> paramMap) {
-    	StringBuilder builder = new StringBuilder();
-    	for (Map.Entry<String, String> entry : paramMap.entrySet()) {
-    		if (builder.length() > 0) builder.append("&");
-			builder.append(entry.getKey()).append("=").append(entry.getValue() != null ? entry.getValue() : "");
-		}
-    	return builder.toString();
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, String> entry : paramMap.entrySet()) {
+            if (builder.length() > 0) builder.append("&");
+            builder.append(entry.getKey()).append("=").append(entry.getValue() != null ? entry.getValue() : "");
+        }
+        return builder.toString();
     }
 
     /**
@@ -456,7 +455,7 @@ public class DBPlugin extends PlayPlugin {
         public static Map<String, Integer> isolationLevels;
 
         static {
-            isolationLevels = new HashMap<String, Integer>();
+            isolationLevels = new HashMap<>();
             isolationLevels.put("NONE", Connection.TRANSACTION_NONE);
             isolationLevels.put("READ_UNCOMMITTED", Connection.TRANSACTION_READ_UNCOMMITTED);
             isolationLevels.put("READ_COMMITTED", Connection.TRANSACTION_READ_COMMITTED);

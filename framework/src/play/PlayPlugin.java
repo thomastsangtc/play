@@ -202,22 +202,22 @@ public abstract class PlayPlugin implements Comparable<PlayPlugin> {
 
     /**
      * Called after an invocation.
-     * (unless an excetion has been thrown).
+     * (unless an exception has been thrown).
      * Time to close request specific things.
      */
     public void afterInvocation() {
     }
 
     /**
-     * Called if an exception occured during the invocation.
-     * @param e The catched exception.
+     * Called if an exception occurred during the invocation.
+     * @param e The caught exception.
      */
     public void onInvocationException(Throwable e) {
     }
 
     /**
      * Called at the end of the invocation.
-     * (even if an exception occured).
+     * (even if an exception occurred).
      * Time to close request specific things.
      */
     public void invocationFinally() {
@@ -398,7 +398,7 @@ public abstract class PlayPlugin implements Comparable<PlayPlugin> {
      * You can access your Request and Response object within the filter. See the JPA plugin for an example.
      * The JPA plugin wraps a transaction around an action. The filter applies a transaction to the current Action.
      */
-    public static abstract class Filter<T>
+  public abstract static class Filter<T>
     {
         String name;
 

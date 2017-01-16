@@ -13,9 +13,9 @@ import org.apache.ivy.util.MessageLogger;
 
 public class HumanReadyLogger implements MessageLogger, TransferListener {
 
-    Set<String> notFound = new HashSet<String>();
-    Set<String> dynamics = new HashSet<String>();
-    Set<String> evicteds = new HashSet<String>();
+    Set<String> notFound = new HashSet<>();
+    Set<String> dynamics = new HashSet<>();
+    Set<String> evicteds = new HashSet<>();
     Pattern dep = Pattern.compile("found ([^#]+)#([^;]+);([^\\s]+) in (.*)");
     Pattern depNotFound = Pattern.compile("module not found: ([^#]+)#([^;]+);([^\\s]+)");
     Pattern dynamic = Pattern.compile("\\[(.*)\\] ([^#]+)#([^;]+);([^\\s]+)");
@@ -40,7 +40,7 @@ public class HumanReadyLogger implements MessageLogger, TransferListener {
                 return;
             }
 
-            if (msg.startsWith("found ")) { // Depedency found
+            if (msg.startsWith("found ")) { // Dependency found
                 if (msg.contains("playCore")) {
                     return;
                 }
@@ -69,7 +69,7 @@ public class HumanReadyLogger implements MessageLogger, TransferListener {
 
             Matcher m = evicted.matcher(msg);
             if (m.matches()) {
-                evicteds.add(m.group(2) + " " + m.group(3) + " is overriden by " + m.group(5) + " " + m.group(6));
+                evicteds.add(m.group(2) + " " + m.group(3) + " is overridden by " + m.group(5) + " " + m.group(6));
                 return;
             }
 
@@ -143,17 +143,17 @@ public class HumanReadyLogger implements MessageLogger, TransferListener {
     }
 
     @Override
-    public List getProblems() {
+    public List<String> getProblems() {
         return null;
     }
 
     @Override
-    public List getWarns() {
+    public List<String> getWarns() {
         return null;
     }
 
     @Override
-    public List getErrors() {
+    public List<String> getErrors() {
         return null;
     }
 

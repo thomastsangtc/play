@@ -1,5 +1,9 @@
 package play.templates;
 
+import java.nio.file.FileSystem;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -13,12 +17,9 @@ import play.vfs.VirtualFile;
 import play.exceptions.TemplateCompilationException;
 import play.exceptions.TemplateNotFoundException;
 
-/**
- * Load templates
- */
 public class TemplateLoader {
 
-    protected static Map<String, BaseTemplate> templates = new HashMap<String, BaseTemplate>();
+    protected static Map<String, BaseTemplate> templates = new HashMap<>();
     /**
      * See getUniqueNumberForTemplateFile() for more info
      */
@@ -64,8 +65,8 @@ public class TemplateLoader {
         }
 
         // Use default engine
-        final String fileRelativePath = file.relativePath();
-        final String key = getUniqueNumberForTemplateFile(fileRelativePath);
+        String fileRelativePath = file.relativePath();
+        String key = getUniqueNumberForTemplateFile(fileRelativePath);
         if (!templates.containsKey(key) || templates.get(key).compiledTemplate == null) {
             if (Play.usePrecompiled) {
                 BaseTemplate template = new GroovyTemplate(fileRelativePath.replaceAll("\\{(.*)\\}", "from_$1").replace(":", "_").replace("..", "parent"), "");
@@ -73,8 +74,8 @@ public class TemplateLoader {
                     template.loadPrecompiled();
                     templates.put(key, template);
                     return template;
-                } catch(Exception e) {
-                    Logger.warn("Precompiled template %s not found, trying to load it dynamically...", file.relativePath());
+                } catch (Exception e) {
+                    Logger.warn(e, "Precompiled template %s not found, trying to load it dynamically...", file.relativePath());
                 }
             }
             BaseTemplate template = new GroovyTemplate(fileRelativePath, file.contentAsString());
@@ -97,7 +98,7 @@ public class TemplateLoader {
 
     /**
      * Load a template from a String
-     * @param key A unique identifier for the template, used for retreiving a cached template
+     * @param key A unique identifier for the template, used for retrieving a cached template
      * @param source The template source
      * @return A Template
      */
@@ -124,7 +125,7 @@ public class TemplateLoader {
     /**
      * Clean the cache for that key
      * Then load a template from a String
-     * @param key A unique identifier for the template, used for retreiving a cached template
+     * @param key A unique identifier for the template, used for retrieving a cached template
      * @param source The template source
      * @return A Template
      */
@@ -207,7 +208,7 @@ public class TemplateLoader {
      * @return A list of executable templates
      */
     public static List<Template> getAllTemplate() {
-        List<Template> res = new ArrayList<Template>();
+        List<Template> res = new ArrayList<>();
         for (VirtualFile virtualFile : Play.templatesPath) {
             scan(res, virtualFile);
         }
@@ -217,6 +218,46 @@ public class TemplateLoader {
                 Template template = load(vf);
                 if (template != null) {
                     template.compile();
+                }
+            }
+        }
+
+        String play_templates_compile = Play.configuration.getProperty(
+                "play.templates.compile",
+                System.getProperty(
+                        "play.templates.compile",
+                        System.getenv("PLAY_TEMPLATES_COMPILE")));
+        String play_templates_compile_path_separator = Play.configuration.getProperty(
+                "play.templates.compile.path.separator",
+                System.getProperty(
+                        "play.templates.compile.path.separator",
+                        System.getProperty("path.separator")));
+        if (play_templates_compile != null) {
+            for (String yamlTemplate : play_templates_compile.split(play_templates_compile_path_separator)) {
+                VirtualFile vf = null;
+                for (int retry = 0; ; retry++) {
+                    if (retry == 0) {
+                        try {
+                            vf = VirtualFile.open(Play.applicationPath.toPath().resolve(Paths.get(yamlTemplate)).toFile());
+                        } catch (InvalidPathException invalidPathException) { /*ignored*/}
+                    } else if (retry == 1) {
+                        vf = VirtualFile.fromRelativePath(yamlTemplate);
+                    } else {
+                        vf = null;
+                        break;
+                    }
+                    if (vf != null && vf.exists()) {
+                        Template template = load(vf);
+                        if (template != null) {
+                            template.compile();
+                            break;
+                        }
+                    } else {
+                        vf = null;
+                    }
+                }
+                if (vf == null) {
+                    Logger.warn("A template specified by system environment 'PLAY_YAML_TEMPLATES' does not exist or path is wrong. template: '%s'", yamlTemplate);
                 }
             }
         }

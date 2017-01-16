@@ -1,6 +1,5 @@
 package play.db.jpa;
 
-import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.log4j.Level;
 import org.hibernate.ejb.Ejb3Configuration;
 
@@ -9,7 +8,6 @@ import play.Play;
 import play.PlayPlugin;
 import play.classloading.ApplicationClasses.ApplicationClass;
 import play.data.binding.Binder;
-import play.data.binding.NoBinding;
 import play.data.binding.ParamNode;
 import play.data.binding.RootParamNode;
 import play.db.DB;
@@ -20,11 +18,7 @@ import play.exceptions.UnexpectedException;
 
 import javax.persistence.*;
 
-import java.beans.PropertyDescriptor;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
 
@@ -157,7 +151,7 @@ public class JPAPlugin extends PlayPlugin {
                       Logger.debug("Add JPA Model : %s to db %s", clazz, dbName);
                     }         
                 } catch (Exception e) {
-                    Logger.warn("JPA -> Entity not found: %s", entity);
+                    Logger.warn(e, "JPA -> Entity not found: %s", entity);
                 }
             }
             
@@ -302,7 +296,7 @@ public class JPAPlugin extends PlayPlugin {
     private TransactionalFilter txFilter = new TransactionalFilter("TransactionalFilter");
 
     @Override
-    public Filter getFilter() {
+    public Filter<Object> getFilter() {
       return txFilter;
     }
 

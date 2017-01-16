@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import play.Play.Mode;
+import play.classloading.ApplicationClassloader;
 import play.classloading.enhancers.LocalvariablesNamesEnhancer.LocalVariablesNamesTracer;
 import play.exceptions.PlayException;
 import play.exceptions.UnexpectedException;
@@ -40,7 +41,7 @@ public class Invoker {
      * @param invocation The code to run
      * @return The future object, to know when the task is completed
      */
-    public static Future<?> invoke(final Invocation invocation) {
+    public static Future<?> invoke(Invocation invocation) {
         Monitor monitor = MonitorFactory.getMonitor("Invoker queue size", "elmts.");
         monitor.add(executor.getQueue().size());
         invocation.waitInQueue = MonitorFactory.start("Waiting for execution");
@@ -53,7 +54,7 @@ public class Invoker {
      * @param millis The time to wait before, in milliseconds
      * @return The future object, to know when the task is completed
      */
-    public static Future<?> invoke(final Invocation invocation, long millis) {
+    public static Future<?> invoke(Invocation invocation, long millis) {
         Monitor monitor = MonitorFactory.getMonitor("Invocation queue", "elmts.");
         monitor.add(executor.getQueue().size());
         return executor.schedule(invocation, millis, TimeUnit.MILLISECONDS);
@@ -84,12 +85,21 @@ public class Invoker {
         }
     }
 
+    static void resetClassloaders() {
+        Thread[] executorThreads = new Thread[executor.getPoolSize()];
+        Thread.enumerate(executorThreads);
+        for (Thread thread : executorThreads) {
+            if (thread != null && thread.getContextClassLoader() instanceof ApplicationClassloader)
+                thread.setContextClassLoader(ClassLoader.getSystemClassLoader());
+        }
+    }
+
     /**
      * The class/method that will be invoked by the current operation
      */
     public static class InvocationContext {
 
-        public static ThreadLocal<InvocationContext> current = new ThreadLocal<InvocationContext>();
+        public static final ThreadLocal<InvocationContext> current = new ThreadLocal<>();
         private final List<Annotation> annotations;
         private final String invocationType;
 
@@ -99,7 +109,7 @@ public class Invoker {
 
         public InvocationContext(String invocationType) {
             this.invocationType = invocationType;
-            this.annotations = new ArrayList<Annotation>();
+            this.annotations = new ArrayList<>();
         }
 
         public InvocationContext(String invocationType, List<Annotation> annotations) {
@@ -114,7 +124,7 @@ public class Invoker {
 
         public InvocationContext(String invocationType, Annotation[]... annotations) {
             this.invocationType = invocationType;
-            this.annotations = new ArrayList<Annotation>();
+            this.annotations = new ArrayList<>();
             for (Annotation[] some : annotations) {
                 this.annotations.addAll(Arrays.asList(some));
             }
@@ -167,7 +177,7 @@ public class Invoker {
     /**
      * An Invocation in something to run in a Play! context
      */
-    public static abstract class Invocation implements Runnable {
+    public abstract static class Invocation implements Runnable {
 
         /**
          * If set, monitor the time the invocation waited in the queue
@@ -192,7 +202,7 @@ public class Invoker {
         }
 
         /**
-         * Init the call (especially usefull in DEV mode to detect changes)
+         * Init the call (especially useful in DEV mode to detect changes)
          */
         public boolean init() {
             Thread.currentThread().setContextClassLoader(Play.classloader);
@@ -265,8 +275,8 @@ public class Invoker {
             InvocationContext.current.remove();
         }
 
-        private void withinFilter(final play.libs.F.Function0<Void> fct) throws Throwable {
-          final F.Option<PlayPlugin.Filter<Void>> filters = Play.pluginCollection.composeFilters();
+        private void withinFilter(play.libs.F.Function0<Void> fct) throws Throwable {
+          F.Option<PlayPlugin.Filter<Void>> filters = Play.pluginCollection.composeFilters();
           if (filters.isDefined()) {
             filters.get().withinFilter(fct);
           }
@@ -314,7 +324,7 @@ public class Invoker {
     /**
      * A direct invocation (in the same thread than caller)
      */
-    public static abstract class DirectInvocation extends Invocation {
+    public abstract static class DirectInvocation extends Invocation {
 
         public static final String invocationType = "DirectInvocation";
 
@@ -391,7 +401,7 @@ public class Invoker {
         Map<Future<?>, Invocation> queue;
 
         public WaitForTasksCompletion() {
-            queue = new ConcurrentHashMap<Future<?>, Invocation>();
+            queue = new ConcurrentHashMap<>();
             setName("WaitForTasksCompletion");
             setDaemon(true);
         }
@@ -422,7 +432,7 @@ public class Invoker {
             while (true) {
                 try {
                     if (!queue.isEmpty()) {
-                        for (Future<?> task : new HashSet<Future<?>>(queue.keySet())) {
+                        for (Future<?> task : new HashSet<>(queue.keySet())) {
                             if (task.isDone()) {
                                 executor.submit(queue.get(task));
                                 queue.remove(task);

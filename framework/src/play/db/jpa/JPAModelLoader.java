@@ -144,8 +144,8 @@ public class JPAModelLoader implements Model.Factory {
      */
     @Override
     public List<Model.Property> listProperties() {
-        List<Model.Property> properties = new ArrayList<Model.Property>();
-        Set<Field> fields = new LinkedHashSet<Field>();
+        List<Model.Property> properties = new ArrayList<>();
+        Set<Field> fields = new LinkedHashSet<>();
         Class<?> tclazz = this.clazz;
         while (!tclazz.equals(Object.class)) {
             Collections.addAll(fields, tclazz.getDeclaredFields());
@@ -227,7 +227,7 @@ public class JPAModelLoader implements Model.Factory {
             if (this.properties != null){
                 return;
             }
-            this.properties = new HashMap<String, Model.Property>();
+            this.properties = new HashMap<>();
             Set<Field> fields = getModelFields(this.clazz);
             for (Field f : fields) {
                 int mod = f.getModifiers();
@@ -305,11 +305,11 @@ public class JPAModelLoader implements Model.Factory {
             }
 
             // Is it a composite key? If yes we need to return the matching PK
-            final Field[] fields = keyFields();
-            final Object[] values = new Object[fields.length];
+            Field[] fields = keyFields();
+            Object[] values = new Object[fields.length];
             int i = 0;
             for (Field f : fields) {
-                final Object o = f.get(m);
+                Object o = f.get(m);
                 if (o != null) {
                     values[i++] = o;
                 }
@@ -327,7 +327,7 @@ public class JPAModelLoader implements Model.Factory {
     }
 
     public static Set<Field> getModelFields(Class<?> clazz) {
-        Set<Field> fields = new LinkedHashSet<Field>();
+        Set<Field> fields = new LinkedHashSet<>();
         Class<?> tclazz = clazz;
         while (!tclazz.equals(Object.class)) {
             // Only add fields for mapped types
@@ -351,7 +351,7 @@ public class JPAModelLoader implements Model.Factory {
                 c = c.getSuperclass();
             }
         } catch (Exception e) {
-            throw new UnexpectedException("Error while determining the object @Id for an object of type " + clazz);
+            throw new UnexpectedException("Error while determining the object @Id for an object of type " + clazz, e);
         }
         throw new UnexpectedException("Cannot get the object @Id for an object of type " + clazz);
     }
@@ -359,7 +359,7 @@ public class JPAModelLoader implements Model.Factory {
     Field[] keyFields() {
         Class<?> c = this.clazz;
         try {
-            List<Field> fields = new ArrayList<Field>();
+            List<Field> fields = new ArrayList<>();
             while (!c.equals(Object.class)) {
                 for (Field field : c.getDeclaredFields()) {
                     if (field.isAnnotationPresent(Id.class) || field.isAnnotationPresent(EmbeddedId.class)) {
@@ -369,13 +369,13 @@ public class JPAModelLoader implements Model.Factory {
                 }
                 c = c.getSuperclass();
             }
-            final Field[] f = fields.toArray(new Field[fields.size()]);
+            Field[] f = fields.toArray(new Field[fields.size()]);
             if (f.length == 0) {
                 throw new UnexpectedException("Cannot get the object @Id for an object of type " + clazz);
             }
             return f;
         } catch (Exception e) {
-            throw new UnexpectedException("Error while determining the object @Id for an object of type " + clazz);
+            throw new UnexpectedException("Error while determining the object @Id for an object of type " + clazz, e);
         }
     }
 

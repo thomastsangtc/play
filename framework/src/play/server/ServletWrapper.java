@@ -71,7 +71,7 @@ public class ServletWrapper extends HttpServlet implements ServletContextListene
         ClassLoader oldClassLoader = Thread.currentThread().getContextClassLoader();
         String appDir = e.getServletContext().getRealPath("/WEB-INF/application");
         File root = new File(appDir);
-        final String playId = System.getProperty("play.id", e.getServletContext().getInitParameter("play.id"));
+        String playId = System.getProperty("play.id", e.getServletContext().getInitParameter("play.id"));
         if (StringUtils.isEmpty(playId)) {
             throw new UnexpectedException("Please define a play.id parameter in your web.xml file. Without that parameter, play! cannot start your application. Please add a context-param into the WEB-INF/web.xml file.");
         }
@@ -159,8 +159,8 @@ public class ServletWrapper extends HttpServlet implements ServletContextListene
             serveStatic(httpServletResponse, httpServletRequest, e);
             return;
         } catch(URISyntaxException e) {
-			 serve404(httpServletRequest, httpServletResponse, new NotFound(e.toString()));
-	         return;
+            serve404(httpServletRequest, httpServletResponse, new NotFound(e.toString()));
+            return;
         } catch (Throwable e) {
             throw new ServletException(e);
         } finally {
@@ -247,8 +247,8 @@ public class ServletWrapper extends HttpServlet implements ServletContextListene
     }
 
     public static Request parseRequest(HttpServletRequest httpServletRequest) throws Exception {
-	 	
-		URI uri = new URI(httpServletRequest.getRequestURI());
+
+        URI uri = new URI(httpServletRequest.getRequestURI());
         String method = httpServletRequest.getMethod().intern();
         String path = uri.getPath();
         String querystring = httpServletRequest.getQueryString() == null ? "" : httpServletRequest.getQueryString();
@@ -289,7 +289,7 @@ public class ServletWrapper extends HttpServlet implements ServletContextListene
         boolean isLoopback = host.matches("^127\\.0\\.0\\.1:?[0-9]*$");
 
 
-        final Request request = Request.createRequest(
+        Request request = Request.createRequest(
                 remoteAddress,
                 method,
                 path,
@@ -313,16 +313,16 @@ public class ServletWrapper extends HttpServlet implements ServletContextListene
     }
 
     protected static Map<String, Http.Header> getHeaders(HttpServletRequest httpServletRequest) {
-        Map<String, Http.Header> headers = new HashMap<String, Http.Header>(16);
+        Map<String, Http.Header> headers = new HashMap<>(16);
 
-        Enumeration headersNames = httpServletRequest.getHeaderNames();
+        Enumeration<String> headersNames = httpServletRequest.getHeaderNames();
         while (headersNames.hasMoreElements()) {
             Http.Header hd = new Http.Header();
-            hd.name = (String) headersNames.nextElement();
-            hd.values = new ArrayList<String>();
-            Enumeration enumValues = httpServletRequest.getHeaders(hd.name);
+            hd.name = headersNames.nextElement();
+            hd.values = new ArrayList<>();
+            Enumeration<String> enumValues = httpServletRequest.getHeaders(hd.name);
             while (enumValues.hasMoreElements()) {
-                String value = (String) enumValues.nextElement();
+                String value = enumValues.nextElement();
                 hd.values.add(value);
             }
             headers.put(hd.name.toLowerCase(), hd);
@@ -332,7 +332,7 @@ public class ServletWrapper extends HttpServlet implements ServletContextListene
     }
 
     protected static Map<String, Http.Cookie> getCookies(HttpServletRequest httpServletRequest) {
-        Map<String, Http.Cookie> cookies = new HashMap<String, Http.Cookie>(16);
+        Map<String, Http.Cookie> cookies = new HashMap<>(16);
         javax.servlet.http.Cookie[] cookiesViaServlet = httpServletRequest.getCookies();
         if (cookiesViaServlet != null) {
             for (javax.servlet.http.Cookie cookie : cookiesViaServlet) {
@@ -354,7 +354,7 @@ public class ServletWrapper extends HttpServlet implements ServletContextListene
         Logger.warn("404 -> %s %s (%s)", servletRequest.getMethod(), servletRequest.getRequestURI(), e.getMessage());
         servletResponse.setStatus(404);
         servletResponse.setContentType("text/html");
-        Map<String, Object> binding = new HashMap<String, Object>();
+        Map<String, Object> binding = new HashMap<>();
         binding.put("result", e);
         binding.put("session", Scope.Session.current());
         binding.put("request", Http.Request.current());
@@ -364,7 +364,7 @@ public class ServletWrapper extends HttpServlet implements ServletContextListene
         try {
             binding.put("errors", Validation.errors());
         } catch (Exception ex) {
-            //
+            Logger.error(ex, "Failed to bind errors");
         }
         String format = Request.current().format;
         servletResponse.setStatus(404);
@@ -386,7 +386,7 @@ public class ServletWrapper extends HttpServlet implements ServletContextListene
 
     public void serve500(Exception e, HttpServletRequest request, HttpServletResponse response) {
         try {
-            Map<String, Object> binding = new HashMap<String, Object>();
+            Map<String, Object> binding = new HashMap<>();
             if (!(e instanceof PlayException)) {
                 e = new play.exceptions.UnexpectedException(e);
             }
@@ -405,7 +405,7 @@ public class ServletWrapper extends HttpServlet implements ServletContextListene
                     }
                 }
             } catch (Exception exx) {
-                // humm ?
+                Logger.error(exx, "Failed to flush cookies");
             }
             binding.put("exception", e);
             binding.put("session", Scope.Session.current());
@@ -416,7 +416,7 @@ public class ServletWrapper extends HttpServlet implements ServletContextListene
             try {
                 binding.put("errors", Validation.errors());
             } catch (Exception ex) {
-                //
+                Logger.error(ex, "Failed to bind errors");
             }
             response.setStatus(500);
             String format = "html";

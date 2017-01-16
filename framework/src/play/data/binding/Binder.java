@@ -12,11 +12,9 @@ import play.exceptions.UnexpectedException;
 
 import java.io.File;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Array;
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
+import java.lang.reflect.*;
 import java.math.BigDecimal;
+import java.text.ParseException;
 import java.util.*;
 
 
@@ -24,11 +22,11 @@ import java.util.*;
  * The binder try to convert String values to Java objects.
  */
 public abstract class Binder {
-    public final static Object MISSING = new Object();
-    private final static Object DIRECTBINDING_NO_RESULT = new Object();
-    public final static Object NO_BINDING = new Object();
+    public static final Object MISSING = new Object();
+    private static final Object DIRECTBINDING_NO_RESULT = new Object();
+    public static final Object NO_BINDING = new Object();
 
-    static final Map<Class<?>, TypeBinder<?>> supportedTypes = new HashMap<Class<?>, TypeBinder<?>>();
+    static final Map<Class<?>, TypeBinder<?>> supportedTypes = new HashMap<>();
 
     // TODO: something a bit more dynamic? The As annotation allows you to inject your own binder
     static {
@@ -45,12 +43,28 @@ public abstract class Binder {
         supportedTypes.put(byte[][].class, new ByteArrayArrayBinder());
     }
 
-
+    /**
+     * Add custom binder for any given class
+     * 
+     * E.g. @{code Binder.register(BigDecimal.class, new MyBigDecimalBinder());}
+     * 
+     * NB! Do not forget to UNREGISTER your custom binder when applications is reloaded (most probably in method onApplicationStop()).
+     * Otherwise you will have a memory leak.
+     * 
+     * @see #unregister(java.lang.Class)
+     */
     public static <T> void register(Class<T> clazz, TypeBinder<T> typeBinder) {
         supportedTypes.put(clazz, typeBinder);
     }
 
-    static Map<Class<?>, BeanWrapper> beanwrappers = new HashMap<Class<?>, BeanWrapper>();
+    /**
+     * Remove custom binder that was add with method #register(java.lang.Class, play.data.binding.TypeBinder)
+     */
+    public static <T> void unregister(Class<T> clazz) {
+        supportedTypes.remove(clazz);
+    }
+
+    static Map<Class<?>, BeanWrapper> beanwrappers = new HashMap<>();
 
     static BeanWrapper getBeanWrapper(Class<?> clazz) {
         if (!beanwrappers.containsKey(clazz)) {
@@ -93,14 +107,14 @@ public abstract class Binder {
     }
 
     public static Object bind(RootParamNode parentParamNode, String name, Class<?> clazz, Type type, Annotation[] annotations, MethodAndParamInfo methodAndParamInfo) {
-        final ParamNode paramNode = parentParamNode.getChild(name, true);
+        ParamNode paramNode = parentParamNode.getChild(name, true);
 
         Object result = null;
         if (paramNode == null) {
             result = MISSING;
         }
 
-        final BindingAnnotations bindingAnnotations = new BindingAnnotations(annotations);
+        BindingAnnotations bindingAnnotations = new BindingAnnotations(annotations);
 
         if (bindingAnnotations.checkNoBinding()) {
             return NO_BINDING;
@@ -124,9 +138,9 @@ public abstract class Binder {
                     Method method = methodAndParamInfo.method;
                     Method defaultMethod = method.getDeclaringClass().getDeclaredMethod(method.getName() + "$default$" + methodAndParamInfo.parameterIndex);
                     return defaultMethod.invoke(methodAndParamInfo.objectInstance);
-                } catch (NoSuchMethodException e) {
-                    //
+                } catch (NoSuchMethodException ignore) {
                 } catch (Exception e) {
+                    logBindingNormalFailure(paramNode, e);
                     throw new UnexpectedException(e);
                 }
             }
@@ -181,7 +195,7 @@ public abstract class Binder {
             }
 
             if (Map.class.isAssignableFrom(clazz)) {
-                return bindMap(clazz, type, paramNode, bindingAnnotations);
+                return bindMap(type, paramNode, bindingAnnotations);
             }
 
             if (Collection.class.isAssignableFrom(clazz)) {
@@ -199,16 +213,33 @@ public abstract class Binder {
             if (clazz.isArray()) {
                 return bindArray(clazz, paramNode, bindingAnnotations);
             }
-			
-			if (!paramNode.getAllChildren().isEmpty()) {
-	        	return internalBindBean(clazz, paramNode, bindingAnnotations);
-	        }
+
+            if (!paramNode.getAllChildren().isEmpty()) {
+                return internalBindBean(clazz, paramNode, bindingAnnotations);
+            }
 
             return null; // give up
+        } catch (NumberFormatException | ParseException e) {
+            logBindingNormalFailure(paramNode, e);
+            addValidationError(paramNode);
         } catch (Exception e) {
-            Validation.addError(paramNode.getOriginalKey(), "validation.invalid");
+            // TODO This is bad catch. I would like to remove it in next version.
+            logBindingUnexpectedFailure(paramNode, e);
+            addValidationError(paramNode);
         }
         return MISSING;
+    }
+
+    private static void addValidationError(ParamNode paramNode) {
+        Validation.addError(paramNode.getOriginalKey(), "validation.invalid");
+    }
+
+    private static void logBindingUnexpectedFailure(ParamNode paramNode, Exception e) {
+        Logger.error(e, "Failed to bind %s=%s", paramNode.getOriginalKey(), Arrays.toString(paramNode.getValues()));
+    }
+
+    private static void logBindingNormalFailure(ParamNode paramNode, Exception e) {
+        Logger.debug("Failed to bind %s=%s: %s", paramNode.getOriginalKey(), Arrays.toString(paramNode.getValues()), e);
     }
 
     private static Object bindArray(Class<?> clazz, ParamNode paramNode, BindingAnnotations bindingAnnotations) {
@@ -225,7 +256,7 @@ public abstract class Binder {
                 for (Annotation annotation : bindingAnnotations.annotations) {
                     if (annotation.annotationType().equals(As.class)) {
                         As as = ((As) annotation);
-                        final String separator = as.value()[0];
+                        String separator = as.value()[0];
                         values = values[0].split(separator);
                     }
                 }
@@ -238,7 +269,7 @@ public abstract class Binder {
                 try {
                     Array.set(array, i - invalidItemsCount, directBind(paramNode.getOriginalKey(), bindingAnnotations.annotations, thisValue, componentType, componentType));
                 } catch (Exception e) {
-                    // bad item..
+                    Logger.debug("Bad item #%s: %s", i, e);
                     invalidItemsCount++;
                 }
             }
@@ -252,7 +283,7 @@ public abstract class Binder {
                     try {
                         Array.set(array, i - invalidItemsCount, childValue);
                     } catch (Exception e) {
-                        // bad item..
+                        Logger.debug("Bad item #%s: %s", i, e);
                         invalidItemsCount++;
                     }
                 }
@@ -273,10 +304,24 @@ public abstract class Binder {
         return array;
     }
 
-    private static Object internalBindBean(Class<?> clazz, ParamNode paramNode, BindingAnnotations bindingAnnotations) throws Exception {
-        Object bean = clazz.newInstance();
+    private static Object internalBindBean(Class<?> clazz, ParamNode paramNode, BindingAnnotations bindingAnnotations) {
+        Object bean = createNewInstance(clazz);
         internalBindBean(paramNode, bean, bindingAnnotations);
         return bean;
+    }
+
+    private static <T> T createNewInstance(Class<T> clazz) {
+        try {
+            Constructor<T> constructor = clazz.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            return constructor.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+            Logger.warn("Failed to create instance of %s: %s", clazz.getName(), e);
+            throw new UnexpectedException(e);
+        } catch (NoSuchMethodException | InvocationTargetException e) {
+            Logger.error("Failed to create instance of %s: %s", clazz.getName(), e);
+            throw new UnexpectedException(e);
+        }
     }
 
     /**
@@ -294,8 +339,9 @@ public abstract class Binder {
 
         try {
             internalBindBean(paramNode, bean, new BindingAnnotations());
-        } catch (Exception e) {
-            Validation.addError(paramNode.getOriginalKey(), "validation.invalid");
+        } catch (NumberFormatException e) {
+            logBindingNormalFailure(paramNode, e);
+            addValidationError(paramNode);
         }
 
     }
@@ -303,11 +349,11 @@ public abstract class Binder {
     /**
      * Does NOT invoke plugins
      */
-    public static void bindBean(ParamNode paramNode, Object bean, Annotation[] annotations) throws Exception {
+    public static void bindBean(ParamNode paramNode, Object bean, Annotation[] annotations) {
         internalBindBean(paramNode, bean, new BindingAnnotations(annotations));
     }
 
-    private static void internalBindBean(ParamNode paramNode, Object bean, BindingAnnotations bindingAnnotations) throws Exception {
+    private static void internalBindBean(ParamNode paramNode, Object bean, BindingAnnotations bindingAnnotations) {
 
         BeanWrapper bw = getBeanWrapper(bean.getClass());
         for (BeanWrapper.Property prop : bw.getWrappers()) {
@@ -336,7 +382,7 @@ public abstract class Binder {
     }
 
     @SuppressWarnings("unchecked")
-    private static Object bindEnum(Class<?> clazz, ParamNode paramNode) throws Exception {
+    private static Object bindEnum(Class<?> clazz, ParamNode paramNode) {
         if (paramNode.getValues() == null) {
             return MISSING;
         }
@@ -349,7 +395,7 @@ public abstract class Binder {
         return Enum.valueOf((Class<? extends Enum>) clazz, value);
     }
 
-    private static Object bindMap(Class<?> clazz, Type type, ParamNode paramNode, BindingAnnotations bindingAnnotations) throws Exception {
+    private static Object bindMap(Type type, ParamNode paramNode, BindingAnnotations bindingAnnotations) {
         Class keyClass = String.class;
         Class valueClass = String.class;
         if (type instanceof ParameterizedType) {
@@ -357,7 +403,7 @@ public abstract class Binder {
             valueClass = (Class) ((ParameterizedType) type).getActualTypeArguments()[1];
         }
 
-        Map<Object, Object> r = new HashMap<Object, Object>();
+        Map<Object, Object> r = new HashMap<>();
 
         for (ParamNode child : paramNode.getAllChildren()) {
             try {
@@ -367,8 +413,12 @@ public abstract class Binder {
                     valueObject = null;
                 }
                 r.put(keyObject, valueObject);
-            } catch (Exception e) {
+            } catch (ParseException | NumberFormatException e) {
                 // Just ignore the exception and continue on the next item
+                logBindingNormalFailure(paramNode, e);
+            } catch (Exception e) {
+                // TODO This is bad catch. I would like to remove it in next version.
+                logBindingUnexpectedFailure(paramNode, e);
             }
         }
 
@@ -376,7 +426,7 @@ public abstract class Binder {
     }
 
     @SuppressWarnings("unchecked")
-    private static Object bindCollection(Class<?> clazz, Type type, ParamNode paramNode, BindingAnnotations bindingAnnotations) throws Exception {
+    private static Object bindCollection(Class<?> clazz, Type type, ParamNode paramNode, BindingAnnotations bindingAnnotations) {
         if (clazz.isInterface()) {
             if (clazz.equals(List.class)) {
                 clazz = ArrayList.class;
@@ -412,9 +462,9 @@ public abstract class Binder {
                 for (Annotation annotation : bindingAnnotations.annotations) {
                     if (annotation.annotationType().equals(As.class)) {
                         As as = ((As) annotation);
-                        final String separator = as.value()[0];
-                        if (separator != null && !separator.isEmpty()){
-                        	values = values[0].split(separator);
+                        String separator = as.value()[0];
+                        if (separator != null && !separator.isEmpty()) {
+                            values = values[0].split(separator);
                         }
                     }
                 }
@@ -424,7 +474,7 @@ public abstract class Binder {
             if (clazz.equals(EnumSet.class)) {
                 l = EnumSet.noneOf(componentClass);
             } else {
-                l = (Collection) clazz.newInstance();
+                l = (Collection) createNewInstance(clazz);
             }
             boolean hasMissing = false;
             for (int i = 0; i < values.length; i++) {
@@ -437,6 +487,7 @@ public abstract class Binder {
                     }
                 } catch (Exception e) {
                     // Just ignore the exception and continue on the next item
+                    logBindingNormalFailure(paramNode, e); // TODO debug or error?
                 }
             }
             if(hasMissing && l.size() == 0){
@@ -445,14 +496,14 @@ public abstract class Binder {
             return l;  
         }
 
-        Collection r = (Collection) clazz.newInstance();
+        Collection r = (Collection) createNewInstance(clazz);
 
         if (List.class.isAssignableFrom(clazz)) {
             // Must add items at position resolved from each child's key
             List l = (List) r;
 
             // must get all indexes and sort them so we add items in correct order.
-            Set<String> indexes = new TreeSet<String>(new Comparator<String>() {
+            Set<String> indexes = new TreeSet<>(new Comparator<String>() {
                 @Override
                 public int compare(String arg0, String arg1) {
                     try {
@@ -499,34 +550,21 @@ public abstract class Binder {
     }
 
     /**
-     * @param value
-     * @param clazz
      * @return The binding object
-     * @throws Exception
      */
     public static Object directBind(String value, Class<?> clazz) throws Exception {
         return directBind(null, value, clazz, null);
     }
 
     /**
-     * @param name
-     * @param annotations
-     * @param value
-     * @param clazz
      * @return The binding object
-     * @throws Exception
      */
     public static Object directBind(String name, Annotation[] annotations, String value, Class<?> clazz) throws Exception {
         return directBind(name, annotations, value, clazz, null);
     }
 
     /**
-     * @param annotations
-     * @param value
-     * @param clazz
-     * @param type
      * @return The binding object
-     * @throws Exception
      */
     public static Object directBind(Annotation[] annotations, String value, Class<?> clazz, Type type) throws Exception {
         return directBind(null, annotations, value, clazz, type);
@@ -535,13 +573,7 @@ public abstract class Binder {
     /**
      * This method calls the user's defined binders prior to bind simple type
      *
-     * @param name
-     * @param annotations
-     * @param value
-     * @param clazz
-     * @param type
      * @return The binding object
-     * @throws Exception
      */
     public static Object directBind(String name, Annotation[] annotations, String value, Class<?> clazz, Type type) throws Exception {
         // calls the direct binding and returns null if no value could be resolved..
@@ -561,10 +593,10 @@ public abstract class Binder {
         if (annotations != null) {
             for (Annotation annotation : annotations) {
                 if (annotation.annotationType().equals(As.class)) {
-                    Class<? extends TypeBinder<?>> toInstanciate = ((As) annotation).binder();
-                    if (!(toInstanciate.equals(As.DEFAULT.class))) {
+                    Class<? extends TypeBinder<?>> toInstantiate = ((As) annotation).binder();
+                    if (!(toInstantiate.equals(As.DEFAULT.class))) {
                         // Instantiate the binder
-                        TypeBinder<?> myInstance = toInstanciate.newInstance();
+                        TypeBinder<?> myInstance = createNewInstance(toInstantiate);
                         return myInstance.bind(name, annotations, value, clazz, type);
                     }
                 }
@@ -576,7 +608,7 @@ public abstract class Binder {
             if (c.isAnnotationPresent(Global.class)) {
                 Class<?> forType = (Class) ((ParameterizedType) c.getGenericInterfaces()[0]).getActualTypeArguments()[0];
                 if (forType.isAssignableFrom(clazz)) {
-                    Object result = c.newInstance().bind(name, annotations, value, clazz, type);
+                    Object result = createNewInstance(c).bind(name, annotations, value, clazz, type);
                     if (result != null) {
                         return result;
                     }
@@ -687,6 +719,4 @@ public abstract class Binder {
 
         return DIRECTBINDING_NO_RESULT;
     }
-
-
 }

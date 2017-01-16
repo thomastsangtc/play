@@ -1,10 +1,5 @@
 package play.db.jpa;
 
-import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.EntityTransaction;
-import javax.persistence.PersistenceUnit;
-
 import play.exceptions.JPAException;
 import play.Play;
 import play.Invoker.*;
@@ -23,10 +18,10 @@ import play.libs.F;
  */
 public class JPA {
 
-    protected static Map<String,EntityManagerFactory> emfs = new ConcurrentHashMap<String,EntityManagerFactory>();
+    protected static Map<String,EntityManagerFactory> emfs = new ConcurrentHashMap<>();
     public static final ThreadLocal<Map<String, JPAContext>> currentEntityManager = new ThreadLocal<Map<String, JPAContext>>() {
       @Override protected Map<String, JPAContext> initialValue() {
-        return new ConcurrentHashMap<String, JPAContext>();
+        return new ConcurrentHashMap<>();
       }
     };
     public static String DEFAULT = "default";
@@ -240,7 +235,7 @@ public class JPA {
     public static <T> T withTransaction(String dbName, boolean readOnly, F.Function0<T> block) throws Throwable {
         if (isEnabled()) {
             boolean closeEm = true;
-            // For each existing persisence unit
+            // For each existing persistence unit
            
             try {
                 // we are starting a transaction for all known persistent unit

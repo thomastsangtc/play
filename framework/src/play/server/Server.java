@@ -21,12 +21,12 @@ public class Server {
     public static int httpPort;
     public static int httpsPort;
 
-    public final static String PID_FILE = "server.pid";
+    public static final String PID_FILE = "server.pid";
 
     public Server(String[] args) {
 
         System.setProperty("file.encoding", "utf-8");
-        final Properties p = Play.configuration;
+        Properties p = Play.configuration;
 
         httpPort = Integer.parseInt(getOpt(args, "http.port", p.getProperty("http.port", "-1")));
         httpsPort = Integer.parseInt(getOpt(args, "https.port", p.getProperty("https.port", "-1")));
@@ -127,7 +127,7 @@ public class Server {
         if (Play.mode == Mode.DEV || Play.runingInTestMode()) {
            // print this line to STDOUT - not using logger, so auto test runner will not block if logger is misconfigured (see #1222)     
            System.out.println("~ Server is up and running");
-	}
+        }
     }
 
     private String getOpt(String[] args, String arg, String defaultValue) {
@@ -150,7 +150,7 @@ public class Server {
     }
 
     public static void main(String[] args) throws Exception {
-        File root = new File(System.getProperty("application.path"));
+        File root = new File(System.getProperty("application.path", "."));
         if (System.getProperty("precompiled", "false").equals("true")) {
             Play.usePrecompiled = true;
         }

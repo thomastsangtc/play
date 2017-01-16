@@ -172,7 +172,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
      * The current routeArgs scope: This is a hash map that is accessible during
      * the reverse routing phase. Any variable added to this scope will be used
      * for reverse routing. Useful when you have a param that you want to add to
-     * any route without add it expicitely to every action method.
+     * any route without add it explicitly to every action method.
      *
      * Note: The ControllersEnhancer makes sure that an appropriate thread local
      * version is applied. ie : controller.routeArgs -
@@ -441,7 +441,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
      * @param o
      *            The Java object to serialize
      * @param type
-     *            The Type informations for complex generic types
+     *            The Type information for complex generic types
      */
     protected static void renderJSON(Object o, Type type) {
         throw new RenderJson(o, type);
@@ -561,7 +561,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
     }
 
     /**
-     * Send a 404 Not Found reponse
+     * Send a 404 Not Found response
      */
     protected static void notFound() {
         throw new NotFound("");
@@ -720,12 +720,9 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
      */
     protected static void redirect(String action, boolean permanent, Object... args) {
         try {
-            Map<String, Object> newArgs = new HashMap<String, Object>(args.length);
+            Map<String, Object> newArgs = new HashMap<>(args.length);
             Method actionMethod = (Method) ActionInvoker.getActionMethod(action)[1];
-            String[] names = (String[]) actionMethod.getDeclaringClass()
-                    .getDeclaredField(
-                            "$" + actionMethod.getName() + LocalVariablesNamesTracer.computeMethodHash(actionMethod.getParameterTypes()))
-                    .get(null);
+            String[] names = Java.parameterNames(actionMethod);
             for (int i = 0; i < names.length && i < args.length; i++) {
                 Annotation[] annotations = actionMethod.getParameterAnnotations()[i];
                 boolean isDefault = false;
@@ -807,7 +804,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
      */
     protected static void renderTemplate(String templateName, Object... args) {
         // Template datas
-        Map<String, Object> templateBinding = new HashMap<String, Object>(16);
+        Map<String, Object> templateBinding = new HashMap<>(16);
         for (Object o : args) {
             List<String> names = LocalVariablesNamesTracer.getAllLocalVariableNames(o);
             for (String name : names) {
@@ -884,8 +881,8 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
      * "controllers.Pages.index" returns "views/Pages/index.html".
      */
     protected static String template() {
-        final Request theRequest = Request.current();
-        final String format = theRequest.format;
+        Request theRequest = Request.current();
+        String format = theRequest.format;
         String templateName = theRequest.action.replace(".", "/") + "." + (format == null ? "html" : format);
         if (templateName.startsWith("@")) {
             templateName = templateName.substring(1);
@@ -902,8 +899,8 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
      * "controllers.Pages.index" returns "views/Pages/index.html".
      */
     protected static String template(String templateName) {
-        final Request theRequest = Request.current();
-        final String format = theRequest.format;
+        Request theRequest = Request.current();
+        String format = theRequest.format;
         if (templateName.startsWith("@")) {
             templateName = templateName.substring(1);
             if (!templateName.contains(".")) {
@@ -975,7 +972,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
      */
     @Deprecated
     protected static void parent(Object... args) {
-        Map<String, Object> map = new HashMap<String, Object>(16);
+        Map<String, Object> map = new HashMap<>(16);
         for (Object o : args) {
             List<String> names = LocalVariablesNamesTracer.getAllLocalVariableNames(o);
             for (String name : names) {
@@ -1018,7 +1015,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
             if (superMethod == null) {
                 throw new RuntimeException("PAF");
             }
-            Map<String, String> mapss = new HashMap<String, String>(map.size());
+            Map<String, String> mapss = new HashMap<>(map.size());
             for (Map.Entry<String, Object> entry : map.entrySet()) {
                 Object value = entry.getValue();
                 mapss.put(entry.getKey(), value == null ? null : value.toString());
@@ -1123,7 +1120,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
             // we do not
             // know when calling this method if we're suspending or restoring.
 
-            final String continuationStateKey = "__storeOrRestoreDataStateForContinuations_started";
+            String continuationStateKey = "__storeOrRestoreDataStateForContinuations_started";
             if (Http.Request.current().args.remove(continuationStateKey) != null) {
                 isRestoring = true;
             } else {
@@ -1148,10 +1145,11 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
             // We know that the params are partially reprocessed during
             // awake(Before now), but here we restore the correct values as
             // they where when we performed the await();
-            Map params = (Map) Request.current().args.remove(ActionInvoker.CONTINUATIONS_STORE_PARAMS);
+            Map<String, String[]> params = (Map<String, String[]>) Request.current().args.remove(ActionInvoker.CONTINUATIONS_STORE_PARAMS);
             Scope.Params.current().all().clear();
-            Scope.Params.current().all().putAll(params);
-
+            if (params != null) {
+                Scope.Params.current().all().putAll(params);
+            }
             // Validations
             Validation validation = (Validation) Request.current().args.remove(ActionInvoker.CONTINUATIONS_STORE_VALIDATIONS);
             Validation.current.set(validation);
@@ -1171,7 +1169,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
             // Params
             // Store the actual params values so we can restore the exact same
             // state when awaking.
-            Request.current().args.put(ActionInvoker.CONTINUATIONS_STORE_PARAMS, new HashMap(Scope.Params.current().data));
+            Request.current().args.put(ActionInvoker.CONTINUATIONS_STORE_PARAMS, new HashMap<>(Scope.Params.current().data));
 
             // Validations
             Request.current().args.put(ActionInvoker.CONTINUATIONS_STORE_VALIDATIONS, Validation.current());
@@ -1194,7 +1192,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
             Request.current().args.put(ActionInvoker.F, future);
         } else if (Request.current().args.containsKey(ActionInvoker.F)) {
             // Since the continuation will restart in this code that isn't
-            // intstrumented by javaflow,
+            // instrumented by javaflow,
             // we need to reset the state manually.
             StackRecorder.get().isCapturing = false;
             StackRecorder.get().isRestoring = false;
@@ -1224,7 +1222,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
     }
 
     /**
-     * Verifies that all application-code is properly enhanched.
+     * Verifies that all application-code is properly enhanced.
      * "application code" is the code on the callstack after leaving
      * actionInvoke into the app, and before reentering Controller.await
      */
@@ -1252,7 +1250,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
                         // we're back into the play framework code...
                         return; // done checking
                     } else {
-                        // is this class enhanched?
+                        // is this class enhanced?
                         boolean enhanced = ContinuationEnhancer.isEnhanced(className);
                         if (!enhanced) {
                             throw new ContinuationsException(
@@ -1277,7 +1275,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
     /**
      * Don't use this directly if you don't know why
      */
-    public static ThreadLocal<ActionDefinition> _currentReverse = new ThreadLocal<ActionDefinition>();
+    public static final ThreadLocal<ActionDefinition> _currentReverse = new ThreadLocal<>();
 
     /**
      * @todo - this "Usage" example below doesn't make sense.
@@ -1298,12 +1296,12 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
     }
 
     /**
-     * Register a custoer template name resolver. That letter allows to override
+     * Register a customer template name resolver. That letter allows to override
      * the way templates are resolved.
      */
     public static void registerTemplateNameResolver(ITemplateNameResolver templateNameResolver) {
         if (null != Controller.templateNameResolver)
-            Logger.warn("Existing tempate name resolver will be overriden!");
+            Logger.warn("Existing template name resolver will be overridden!");
         Controller.templateNameResolver = templateNameResolver;
     }
 
@@ -1311,11 +1309,11 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
      * This allow people that implements their own template engine to override
      * the way template are resolved.
      */
-    public static interface ITemplateNameResolver {
+    public interface ITemplateNameResolver {
         /**
          * Return the template path given a template name.
          */
-        public String resolveTemplateName(String templateName);
+        String resolveTemplateName(String templateName);
     }
 
 }

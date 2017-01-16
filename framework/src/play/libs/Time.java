@@ -15,10 +15,10 @@ import java.util.regex.Pattern;
  *
  */
 public class Time {
-    private final static Pattern p = Pattern.compile("(([0-9]+?)((d|h|mi|min|mn|s)))+?");
-    private final static Integer MINUTE = 60;
-    private final static Integer HOUR = 60 * MINUTE;
-    private final static Integer DAY = 24 * HOUR;
+    private static final Pattern p = Pattern.compile("(([0-9]+?)((d|h|mi|min|mn|s)))+?");
+    private static final Integer MINUTE = 60;
+    private static final Integer HOUR = 60 * MINUTE;
+    private static final Integer DAY = 24 * HOUR;
 
     /**
      * Parse a duration
@@ -32,7 +32,7 @@ public class Time {
             return 30 * DAY;
         }
 
-        final Matcher matcher = p.matcher(duration);
+        Matcher matcher = p.matcher(duration);
         int seconds = 0;
         if (!matcher.matches()) {
             throw new IllegalArgumentException("Invalid duration pattern : " + duration);

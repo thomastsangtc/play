@@ -43,7 +43,6 @@ import play.libs.IO;
 public class YamlParser extends AbstractModuleDescriptorParser {
 
     static class Oops extends Exception {
-
         public Oops(String message) {
             super(message);
         }
@@ -114,7 +113,7 @@ public class YamlParser extends AbstractModuleDescriptorParser {
 
             boolean transitiveDependencies = get(data, "transitiveDependencies", boolean.class, true);
             
-            List<String> confs = new ArrayList<String>();
+            List<String> confs = new ArrayList<>();
             if (data.containsKey("configurations")) {
                 if (data.get("configurations") instanceof List) {
                     boolean allExcludes = true;
@@ -190,11 +189,11 @@ public class YamlParser extends AbstractModuleDescriptorParser {
                             }
                         }
                         HashMap extraAttributesMap = null;
-            			if(m.groupCount() == 4 &&  m.group(4) != null && !m.group(4).trim().isEmpty()){
-            			    // dependency has a classifier
-            			    extraAttributesMap = new HashMap();
-            			    extraAttributesMap.put("classifier", m.group(4).trim());
-            			}
+                        if (m.groupCount() == 4 && m.group(4) != null && !m.group(4).trim().isEmpty()) {
+                            // dependency has a classifier
+                            extraAttributesMap = new HashMap();
+                            extraAttributesMap.put("classifier", m.group(4).trim());
+                        }
 
                         ModuleRevisionId depId = ModuleRevisionId.newInstance(m.group(1), m.group(2), m.group(3), extraAttributesMap);
 
@@ -298,7 +297,7 @@ public class YamlParser extends AbstractModuleDescriptorParser {
     }
 
     public static Set<String> getOrderedModuleList(File file) throws ParseException, IOException {
-        Set<String> modules = new LinkedHashSet<String>();
+        Set<String> modules = new LinkedHashSet<>();
         System.setProperty("application.path", Play.applicationPath.getAbsolutePath());
         return getOrderedModuleList(modules, file);
     }

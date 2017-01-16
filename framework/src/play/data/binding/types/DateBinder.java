@@ -35,13 +35,8 @@ public class DateBinder implements TypeBinder<Date> {
             // Ignore
         }
 
-        try {
-            SimpleDateFormat sdf = new SimpleDateFormat(ISO8601);
-            sdf.setLenient(false);
-            return sdf.parse(value);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Cannot convert [" + value + "] to a Date: " + e.toString());
-        }
-
+        SimpleDateFormat sdf = new SimpleDateFormat(ISO8601);
+        sdf.setLenient(false);
+        return sdf.parse(value);
     }
 }

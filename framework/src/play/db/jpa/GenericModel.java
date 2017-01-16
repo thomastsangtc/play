@@ -74,11 +74,11 @@ public class GenericModel extends JPABase {
         ParamNode paramNode = StringUtils.isEmpty(name) ? rootParamNode : rootParamNode.getChild(name, true);
         // #1195 - Needs to keep track of whick keys we remove so that we can restore it before
         // returning from this method.
-        List<ParamNode.RemovedNode> removedNodesList = new ArrayList<ParamNode.RemovedNode>();
+        List<ParamNode.RemovedNode> removedNodesList = new ArrayList<>();
         try {
             BeanWrapper bw = new BeanWrapper(o.getClass());
             // Start with relations
-            Set<Field> fields = new HashSet<Field>();
+            Set<Field> fields = new HashSet<>();
             Class<?> clazz = o.getClass();
             while (!clazz.equals(Object.class)) {
                 Collections.addAll(fields, clazz.getDeclaredFields());
@@ -92,7 +92,7 @@ public class GenericModel extends JPABase {
                 // First try the field 
                 Annotation[] fieldAnnotations = field.getAnnotations();
                 // and check with the profiles annotations
-                final BindingAnnotations bindingAnnotations = new BindingAnnotations(fieldAnnotations, new BindingAnnotations(annotations).getProfiles());
+                BindingAnnotations bindingAnnotations = new BindingAnnotations(fieldAnnotations, new BindingAnnotations(annotations).getProfiles());
                 if (bindingAnnotations.checkNoBinding()) {
                     continue;
                 }
@@ -253,7 +253,7 @@ public class GenericModel extends JPABase {
     }
 
     /**
-     * Merge this object to obtain a managed entity (usefull when the object comes from the Cache).
+     * Merge this object to obtain a managed entity (useful when the object comes from the Cache).
      */
     public <T extends JPABase> T merge() {
         return (T) em(JPA.getDBName(this.getClass())).merge(this);
@@ -389,13 +389,13 @@ public class GenericModel extends JPABase {
             return this;
         }
 
-		/** 
-		 * Set a named parameter for this query.
-		 **/
-  		public JPAQuery setParameter(String name, Object param) {
-			query.setParameter(name, param);
-	        return this;
-		}
+        /**
+         * Set a named parameter for this query.
+         **/
+        public JPAQuery setParameter(String name, Object param) {
+            query.setParameter(name, param);
+            return this;
+        }
 
         /**
          * Retrieve all results of the query
