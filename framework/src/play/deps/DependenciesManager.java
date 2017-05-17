@@ -298,6 +298,7 @@ public class DependenciesManager {
 
             } else {
                 // A module
+                System.out.println(" ------- " + from.getAbsolutePath() + "   ---   " + from.getName());
                 String mName = from.getName();
                 if (mName.endsWith(".jar") || mName.endsWith(".zip")) {
                     mName = mName.substring(0, mName.length() - 4);

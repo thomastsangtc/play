@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.ivy.core.cache.DefaultRepositoryCacheManager;
 import org.apache.ivy.core.settings.IvySettings;
 import org.apache.ivy.plugins.matcher.PatternMatcher;
 import org.apache.ivy.plugins.resolver.ChainResolver;
@@ -148,6 +149,9 @@ public class SettingsParser {
                 fileSystemResolver.addArtifactPattern(get(options, "artifact", String.class));
             }
             fileSystemResolver.setCheckmodified(true);
+            LocalModuleRepositoryCacheManager localModuleRepositoryCacheManager = new LocalModuleRepositoryCacheManager();
+            fileSystemResolver.setRepositoryCacheManager(localModuleRepositoryCacheManager);
+            settings.addRepositoryCacheManager(localModuleRepositoryCacheManager);
             resolver = fileSystemResolver;
         }
 
