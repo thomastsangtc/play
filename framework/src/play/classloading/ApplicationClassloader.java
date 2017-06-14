@@ -239,7 +239,7 @@ public class ApplicationClassloader extends ClassLoader {
             }
         }
         URL url = this.getResource(name);
-        if (url != null) {
+        if (url != null && "file".equals(url.getProtocol())) {
             try {
                 File file = new File(url.toURI());
                 String fileName = file.getCanonicalFile().getName();
@@ -247,6 +247,7 @@ public class ApplicationClassloader extends ClassLoader {
                     return null;
                 }
             } catch (Exception e) {
+                Logger.warn(e, "Failed to read file " + url);
             }
         }
 
