@@ -450,15 +450,7 @@ public class ApplicationClassloader extends ClassLoader {
                 });
             }
 
-            Map<String, ApplicationClass> byNormalizedName = new HashMap<>(result.size());
-            for (ApplicationClass clazz : Play.classes.all()) {
-                byNormalizedName.put(clazz.name.toLowerCase(), clazz);
-                if (clazz.name.contains("$")) {
-                    byNormalizedName.put(StringUtils.replace(clazz.name.toLowerCase(), "$", "."), clazz);
-                }
-            }
-
-            allClassesByNormalizedName = unmodifiableMap(byNormalizedName);
+            allClassesByNormalizedName = unmodifiableMap(classesByNormalizedName(result));
             allClasses = unmodifiableList(result);
         }
         return allClasses;
@@ -466,6 +458,17 @@ public class ApplicationClassloader extends ClassLoader {
 
     private List<Class> allClasses;
     private Map<String, ApplicationClass> allClassesByNormalizedName;
+    
+    protected Map<String, ApplicationClass> classesByNormalizedName(List<Class> result) {
+        Map<String, ApplicationClass> byNormalizedName = new HashMap<>(result.size());
+        for (ApplicationClass clazz : Play.classes.all()) {
+            byNormalizedName.put(clazz.name.toLowerCase(), clazz);
+            if (clazz.name.contains("$")) {
+                byNormalizedName.put(StringUtils.replace(clazz.name.toLowerCase(), "$", "."), clazz);
+            }
+        }
+        return byNormalizedName;
+    }
 
     /**
      * Retrieve all application classes assignable to this class.
